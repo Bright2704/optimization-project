@@ -13,7 +13,7 @@ Key improvements:
 """
 
 import numpy as np
-from typing import Callable, Tuple, List
+from typing import Callable, Tuple, Optional
 
 
 class GOA_v2:
@@ -34,7 +34,8 @@ class GOA_v2:
         c_max: float = 1.0,
         c_min: float = 0.00001,
         f: float = 0.5,
-        l: float = 1.5
+        l: float = 1.5,
+        seed: Optional[int] = None,
     ):
         self.fitness_func = fitness_func
         self.n_variables = n_variables
@@ -46,6 +47,19 @@ class GOA_v2:
         self.c_min = c_min
         self.f = f
         self.l = l
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
+
+        if self.n_variables < 1:
+            raise ValueError("n_variables must be at least 1")
+        if self.n_grasshoppers < 2:
+            raise ValueError("n_grasshoppers must be at least 2")
+        if self.max_iter < 1:
+            raise ValueError("max_iter must be at least 1")
+        if self.lower_bound.shape != (self.n_variables,) or self.upper_bound.shape != (self.n_variables,):
+            raise ValueError("bounds must contain one value per variable")
+        if np.any(self.lower_bound >= self.upper_bound):
+            raise ValueError("each lower bound must be smaller than its upper bound")
 
         self.best_position = None
         self.best_fitness = None
@@ -74,7 +88,7 @@ class GOA_v2:
         Run the GOA optimization algorithm (Paper-accurate version)
         """
         # Initialize population randomly
-        grasshoppers = np.random.uniform(
+        grasshoppers = self.rng.uniform(
             low=self.lower_bound,
             high=self.upper_bound,
             size=(self.n_grasshoppers, self.n_variables)
@@ -156,7 +170,8 @@ class GOA_v2:
 
             self.convergence_curve.append(target_fitness)
 
-            if verbose and (iteration + 1) % (self.max_iter // 10) == 0:
+            report_every = max(1, self.max_iter // 10)
+            if verbose and (iteration + 1) % report_every == 0:
                 print(f"Iteration {iteration + 1:4d}/{self.max_iter}: "
                       f"Best = {target_fitness:.8f}, c = {c:.6f}")
 
