@@ -7,7 +7,11 @@
       "Bash(/opt/homebrew/opt/python@3.11/bin/python3.11:*)",
       "Bash(/opt/homebrew/bin/python3 -m pip install:*)",
       "Bash(source:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(chmod:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
