@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimization Algorithms Demo</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Language Switcher -->
+        <div class="language-switcher">
+            <button id="lang-th" class="lang-btn active" onclick="setLanguage('th')">🇹🇭 ไทย</button>
+            <button id="lang-en" class="lang-btn" onclick="setLanguage('en')">🇬🇧 English</button>
+        </div>
+
+        <!-- Header -->
+        <header>
+            <h1 data-th="Optimization Algorithms Demo" data-en="Optimization Algorithms Demo">Optimization Algorithms Demo</h1>
+            <p data-th="เปรียบเทียบ 3 Algorithms: RLS, GA, GOA" data-en="Compare 3 Algorithms: RLS, GA, GOA">เปรียบเทียบ 3 Algorithms: RLS, GA, GOA</p>
+        </header>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <div class="control-group">
+                <label data-th="Algorithm:" data-en="Algorithm:">Algorithm:</label>
+                <select id="algorithm">
+                    <option value="rls">Random Local Search (RLS)</option>
+                    <option value="ga">Genetic Algorithm (GA)</option>
+                    <option value="goa">Grasshopper (GOA)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label data-th="Function:" data-en="Function:">Function:</label>
+                <select id="function">
+                    <option value="sphere" data-th="Sphere (ง่าย)" data-en="Sphere (easy)">Sphere (ง่าย)</option>
+                    <option value="rastrigin" data-th="Rastrigin (multimodal)" data-en="Rastrigin (multimodal)">Rastrigin (multimodal)</option>
+                    <option value="rosenbrock" data-th="Rosenbrock (valley)" data-en="Rosenbrock (valley)">Rosenbrock (valley)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label><span data-th="Agents:" data-en="Agents:">Agents:</span> <span id="agents-value">20</span></label>
+                <input type="range" id="n-agents" min="10" max="50" value="20">
+            </div>
+
+            <div class="control-group">
+                <label><span data-th="Iterations:" data-en="Iterations:">Iterations:</span> <span id="iter-value">50</span></label>
+                <input type="range" id="max-iter" min="10" max="200" value="50">
+            </div>
+
+            <button id="run-btn" onclick="runAlgorithm()" data-th="Run Algorithm" data-en="Run Algorithm">Run Algorithm</button>
+            <button id="compare-btn" onclick="compareAll()" data-th="เปรียบเทียบทั้งหมด" data-en="Compare All">เปรียบเทียบทั้งหมด</button>
+        </div>
+
+        <!-- Function Info -->
+        <div class="info-box" id="function-info">
+            <h3>Sphere Function</h3>
+            <p><strong data-th="สูตร:" data-en="Formula:">สูตร:</strong> f(x) = x₁² + x₂²</p>
+            <p><strong>Minimum:</strong> 0 at (0, 0)</p>
+        </div>
+
+        <!-- Results -->
+        <div class="results-panel">
+            <div class="result-card" id="result-card">
+                <h3 data-th="ผลลัพธ์" data-en="Result">ผลลัพธ์</h3>
+                <div id="result-content">
+                    <p data-th="กด 'Run Algorithm' เพื่อเริ่ม" data-en="Click 'Run Algorithm' to start">กด "Run Algorithm" เพื่อเริ่ม</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts">
+            <div class="chart-container">
+                <h3 data-th="Contour Plot (พื้นที่ค้นหา)" data-en="Contour Plot (Search Space)">Contour Plot (พื้นที่ค้นหา)</h3>
+                <div id="contour-plot"></div>
+            </div>
+            <div class="chart-container">
+                <h3 data-th="Convergence (Fitness vs Iteration)" data-en="Convergence (Fitness vs Iteration)">Convergence (Fitness vs Iteration)</h3>
+                <div id="convergence-plot"></div>
+            </div>
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="comparison-section" id="comparison-section" style="display:none;">
+            <h3 data-th="ผลการเปรียบเทียบ" data-en="Comparison Results">ผลการเปรียบเทียบ</h3>
+            <table id="comparison-table">
+                <thead>
+                    <tr>
+                        <th data-th="Algorithm" data-en="Algorithm">Algorithm</th>
+                        <th data-th="Best Fitness" data-en="Best Fitness">Best Fitness</th>
+                        <th data-th="Best Position" data-en="Best Position">Best Position</th>
+                    </tr>
+                </thead>
+                <tbody id="comparison-body">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Algorithm Explanation -->
+        <div class="explanation">
+            <h2 data-th="อธิบาย Algorithms" data-en="Algorithm Explanations">อธิบาย Algorithms</h2>
+
+            <div class="algo-card">
+                <h3>1. Random Local Search (RLS)</h3>
+                <p data-th="แนวคิด: ง่ายที่สุด - สุ่มขยับตำแหน่ง ถ้าดีกว่าเดิมก็รับ"
+                   data-en="Concept: Simplest - randomly move position, accept if better">
+                   <strong data-th="แนวคิด:" data-en="Concept:">แนวคิด:</strong>
+                   <span data-th="ง่ายที่สุด - สุ่มขยับตำแหน่ง ถ้าดีกว่าเดิมก็รับ" data-en="Simplest - randomly move position, accept if better">ง่ายที่สุด - สุ่มขยับตำแหน่ง ถ้าดีกว่าเดิมก็รับ</span>
+                </p>
+                <pre>
+for each iteration:
+    new_pos = current_pos + random_noise
+    if fitness(new_pos) < fitness(current_pos):
+        current_pos = new_pos
+                </pre>
+            </div>
+
+            <div class="algo-card">
+                <h3>2. Genetic Algorithm (GA)</h3>
+                <p>
+                    <strong data-th="แนวคิด:" data-en="Concept:">แนวคิด:</strong>
+                    <span data-th="จำลองวิวัฒนาการ - Selection, Crossover, Mutation" data-en="Simulate evolution - Selection, Crossover, Mutation">จำลองวิวัฒนาการ - Selection, Crossover, Mutation</span>
+                </p>
+                <pre>
+for each generation:
+    1. Selection: <span data-th="เลือกตัวที่ fitness ดี" data-en="select individuals with good fitness">เลือกตัวที่ fitness ดี</span>
+    2. Crossover: <span data-th="ผสม genes" data-en="combine genes">ผสม genes</span> → child = α*parent1 + (1-α)*parent2
+    3. Mutation: <span data-th="เปลี่ยนแปลง genes แบบสุ่ม" data-en="randomly modify genes">เปลี่ยนแปลง genes แบบสุ่ม</span>
+                </pre>
+            </div>
+
+            <div class="algo-card">
+                <h3>3. Grasshopper (GOA)</h3>
+                <p>
+                    <strong data-th="แนวคิด:" data-en="Concept:">แนวคิด:</strong>
+                    <span data-th="จำลองพฤติกรรมตั๊กแตน - ผลัก/ดึงดูด + Target" data-en="Simulate grasshopper behavior - repulsion/attraction + Target">จำลองพฤติกรรมตั๊กแตน - ผลัก/ดึงดูด + Target</span>
+                </p>
+                <pre>
+Social Force: s(r) = f*exp(-r/l) - exp(-r)
+  - <span data-th="ใกล้กัน → ผลักกัน" data-en="close → repulsion">ใกล้กัน → ผลักกัน</span>
+  - <span data-th="ห่างกัน → ดึงดูด" data-en="far → attraction">ห่างกัน → ดึงดูด</span>
+
+Position: X_new = c * [Social Forces] + Target
+  - c <span data-th="ลดลงตาม iteration (exploration → exploitation)" data-en="decreases over iterations (exploration → exploitation)">ลดลงตาม iteration (exploration → exploitation)</span>
+                </pre>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p data-th="Optimization Algorithms Demo - เพื่อการศึกษา" data-en="Optimization Algorithms Demo - For Educational Purposes">Optimization Algorithms Demo - เพื่อการศึกษา</p>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
