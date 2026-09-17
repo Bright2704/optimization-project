@@ -53,6 +53,7 @@
 
             <button id="run-btn" onclick="runAlgorithm()" data-th="Run Algorithm" data-en="Run Algorithm">Run Algorithm</button>
             <button id="compare-btn" onclick="compareAll()" data-th="เปรียบเทียบทั้งหมด" data-en="Compare All">เปรียบเทียบทั้งหมด</button>
+            <button id="animation-btn" onclick="runAnimation()" data-th="▶ ดู Animation" data-en="▶ Watch Animation" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">▶ ดู Animation</button>
         </div>
 
         <!-- Function Info -->
@@ -81,6 +82,77 @@
             <div class="chart-container">
                 <h3 data-th="Convergence (Fitness vs Iteration)" data-en="Convergence (Fitness vs Iteration)">Convergence (Fitness vs Iteration)</h3>
                 <div id="convergence-plot"></div>
+            </div>
+        </div>
+
+        <!-- Animation Section -->
+        <div class="animation-section" id="animation-section" style="display:none;">
+            <h3 data-th="🎬 Animation - ดู Agents เคลื่อนที่" data-en="🎬 Animation - Watch Agents Move">🎬 Animation - ดู Agents เคลื่อนที่</h3>
+
+            <!-- Simple Legend -->
+            <div class="animation-legend">
+                <span class="legend-item"><span class="dot red"></span> <span data-th="Agents (กำลังค้นหา)" data-en="Agents (searching)">Agents (กำลังค้นหา)</span></span>
+                <span class="legend-item"><span class="dot green"></span> <span data-th="เป้าหมาย (คำตอบที่ดีที่สุด)" data-en="Target (best solution)">เป้าหมาย (คำตอบที่ดีที่สุด)</span></span>
+                <span class="legend-item"><span class="dot gray"></span> <span data-th="เส้นทางที่ผ่านมา" data-en="Previous path">เส้นทางที่ผ่านมา</span></span>
+            </div>
+
+            <!-- Big Play Button -->
+            <div class="animation-controls-simple">
+                <button id="play-btn" onclick="playAnimation()" class="big-play-btn">
+                    <span class="play-icon">▶</span>
+                    <span data-th="เล่น" data-en="Play">เล่น</span>
+                </button>
+                <button id="pause-btn" onclick="pauseAnimation()" class="big-pause-btn" disabled>
+                    <span class="pause-icon">⏸</span>
+                    <span data-th="หยุด" data-en="Pause">หยุด</span>
+                </button>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="progress-container">
+                <div class="progress-label">
+                    <span data-th="รอบที่:" data-en="Iteration:">รอบที่:</span>
+                    <strong id="current-iteration" style="font-size: 1.5em; color: #e74c3c;">0</strong>
+                    <span> / <span id="total-iterations">0</span></span>
+                </div>
+                <div class="progress-bar-wrapper">
+                    <input type="range" id="iteration-slider" min="0" max="100" value="0" onchange="seekAnimation(this.value)" oninput="seekAnimation(this.value)">
+                    <div class="progress-bar-fill" id="progress-fill"></div>
+                </div>
+                <div class="fitness-display">
+                    <span data-th="Fitness:" data-en="Fitness:">Fitness:</span>
+                    <strong id="current-fitness" style="color: #27ae60;">-</strong>
+                </div>
+            </div>
+
+            <!-- Small Controls -->
+            <div class="animation-controls-small">
+                <button onclick="resetAnimation()" class="small-btn" data-th="⏮ เริ่มใหม่" data-en="⏮ Reset">⏮ เริ่มใหม่</button>
+                <button onclick="stepAnimation()" class="small-btn" data-th="⏭ ทีละ Step" data-en="⏭ Step">⏭ ทีละ Step</button>
+                <div class="speed-control-inline">
+                    <span data-th="เร็ว:" data-en="Speed:">เร็ว:</span>
+                    <select id="animation-speed" onchange="updateSpeed()">
+                        <option value="0.5">0.5x (ช้า)</option>
+                        <option value="1" selected>1x (ปกติ)</option>
+                        <option value="2">2x (เร็ว)</option>
+                        <option value="4">4x (เร็วมาก)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Animation Plot -->
+            <div class="chart-container animation-chart">
+                <div id="animation-plot"></div>
+            </div>
+
+            <!-- Quick Jump Buttons -->
+            <div class="quick-jump">
+                <span data-th="กระโดดไป:" data-en="Jump to:">กระโดดไป:</span>
+                <button onclick="seekAnimation(0)" class="jump-btn" data-th="เริ่มต้น" data-en="Start">เริ่มต้น</button>
+                <button onclick="seekAnimation(Math.floor(animationData.n_frames * 0.25))" class="jump-btn">25%</button>
+                <button onclick="seekAnimation(Math.floor(animationData.n_frames * 0.5))" class="jump-btn">50%</button>
+                <button onclick="seekAnimation(Math.floor(animationData.n_frames * 0.75))" class="jump-btn">75%</button>
+                <button onclick="seekAnimation(animationData.n_frames - 1)" class="jump-btn" data-th="สุดท้าย" data-en="End">สุดท้าย</button>
             </div>
         </div>
 

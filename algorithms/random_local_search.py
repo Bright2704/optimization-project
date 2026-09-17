@@ -21,7 +21,8 @@ def random_local_search(
     n_agents=30,       # จำนวน agents
     max_iter=100,      # จำนวน iterations
     step_size=0.1,     # ขนาดการขยับ (std ของ normal distribution)
-    seed=None          # random seed สำหรับทำซ้ำได้
+    seed=None,         # random seed สำหรับทำซ้ำได้
+    track_positions=False  # เก็บประวัติตำแหน่งทุก agent (สำหรับ animation)
 ):
     """
     Random Local Search Algorithm
@@ -30,6 +31,7 @@ def random_local_search(
         best_position: ตำแหน่งที่ดีที่สุด
         best_fitness: ค่า fitness ที่ดีที่สุด
         history: ประวัติค่า fitness ที่ดีที่สุดในแต่ละ iteration
+        positions_history: (optional) ตำแหน่งของทุก agent ในแต่ละ iteration
     """
     # ตั้งค่า random seed
     if seed is not None:
@@ -44,6 +46,11 @@ def random_local_search(
 
     # เก็บประวัติ
     history = []
+    positions_history = []  # สำหรับ animation
+
+    # บันทึกตำแหน่งเริ่มต้น
+    if track_positions:
+        positions_history.append(agents.copy())
 
     # === Step 2: Main Loop ===
     for iteration in range(max_iter):
@@ -68,12 +75,18 @@ def random_local_search(
         best_idx = np.argmin(fitness_values)
         history.append(fitness_values[best_idx])
 
+        # บันทึกตำแหน่งทุก agent (สำหรับ animation)
+        if track_positions:
+            positions_history.append(agents.copy())
+
     # === Step 3: Return ผลลัพธ์ ===
     fitness_values = np.array([fitness_func(a) for a in agents])
     best_idx = np.argmin(fitness_values)
     best_position = agents[best_idx]
     best_fitness = fitness_values[best_idx]
 
+    if track_positions:
+        return best_position, best_fitness, history, positions_history
     return best_position, best_fitness, history
 
 

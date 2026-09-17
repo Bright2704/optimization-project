@@ -159,6 +159,88 @@ def run_algorithm():
     })
 
 
+@app.route('/api/run_animation', methods=['POST'])
+def run_animation():
+    """รัน algorithm และส่งประวัติตำแหน่งทุก agent สำหรับ animation"""
+    data = request.json
+
+    # รับ parameters
+    algorithm = data.get('algorithm', 'rls')
+    function_name = data.get('function', 'sphere')
+    n_agents = int(data.get('n_agents', 20))
+    max_iter = int(data.get('max_iter', 50))
+
+    # เลือก function
+    func_info = FUNCTIONS.get(function_name, FUNCTIONS['sphere'])
+    fitness_func = func_info['func']
+    bounds = func_info['bounds']
+
+    # Parameters
+    n_variables = 2  # ใช้ 2D สำหรับ visualization
+    lb = [bounds[0]] * n_variables
+    ub = [bounds[1]] * n_variables
+
+    # รัน algorithm with track_positions=True
+    if algorithm == 'rls':
+        pos, fit, history, positions_history = random_local_search(
+            fitness_func=fitness_func,
+            n_variables=n_variables,
+            lower_bound=lb,
+            upper_bound=ub,
+            n_agents=n_agents,
+            max_iter=max_iter,
+            step_size=0.3,
+            track_positions=True
+        )
+        algo_name = 'Random Local Search'
+
+    elif algorithm == 'ga':
+        pos, fit, history, positions_history = genetic_algorithm(
+            fitness_func=fitness_func,
+            n_variables=n_variables,
+            lower_bound=lb,
+            upper_bound=ub,
+            pop_size=n_agents,
+            max_iter=max_iter,
+            track_positions=True
+        )
+        algo_name = 'Genetic Algorithm'
+
+    elif algorithm == 'goa':
+        pos, fit, history, positions_history = grasshopper_optimization(
+            fitness_func=fitness_func,
+            n_variables=n_variables,
+            lower_bound=lb,
+            upper_bound=ub,
+            n_grasshoppers=n_agents,
+            max_iter=max_iter,
+            track_positions=True
+        )
+        algo_name = 'Grasshopper (GOA)'
+
+    else:
+        return jsonify({'error': 'Unknown algorithm'}), 400
+
+    # แปลง positions_history เป็น list ของ frames
+    # แต่ละ frame = [[x1,y1], [x2,y2], ...] สำหรับทุก agent
+    frames = []
+    for positions in positions_history:
+        frame = [[round(float(p[0]), 4), round(float(p[1]), 4)] for p in positions]
+        frames.append(frame)
+
+    return jsonify({
+        'algorithm': algo_name,
+        'function': func_info['name'],
+        'position': [round(float(p), 6) for p in pos],
+        'fitness': round(float(fit), 8),
+        'history': [round(float(h), 6) for h in history],
+        'bounds': bounds,
+        'frames': frames,  # ประวัติตำแหน่งทุก agent
+        'n_frames': len(frames),
+        'n_agents': n_agents
+    })
+
+
 @app.route('/api/contour', methods=['POST'])
 def get_contour():
     """สร้างข้อมูลสำหรับวาด contour plot"""

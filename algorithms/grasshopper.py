@@ -31,7 +31,8 @@ def grasshopper_optimization(
     c_min=0.00001,      # ค่า c ต่ำสุด
     f=0.5,              # intensity of attraction
     l=1.5,              # attractive length scale
-    seed=None           # random seed
+    seed=None,          # random seed
+    track_positions=False  # เก็บประวัติตำแหน่งทุก agent (สำหรับ animation)
 ):
     """
     Grasshopper Optimisation Algorithm
@@ -40,6 +41,7 @@ def grasshopper_optimization(
         best_position: ตำแหน่งที่ดีที่สุด
         best_fitness: ค่า fitness ที่ดีที่สุด
         history: ประวัติค่า fitness ที่ดีที่สุดในแต่ละ iteration
+        positions_history: (optional) ตำแหน่งของทุก agent ในแต่ละ iteration
     """
     if seed is not None:
         np.random.seed(seed)
@@ -62,6 +64,11 @@ def grasshopper_optimization(
     target_fitness = fitness_values[best_idx]
 
     history = [target_fitness]
+    positions_history = []  # สำหรับ animation
+
+    # บันทึกตำแหน่งเริ่มต้น
+    if track_positions:
+        positions_history.append(grasshoppers.copy())
 
     # === Step 2: Main Loop ===
     for iteration in range(max_iter):
@@ -119,6 +126,12 @@ def grasshopper_optimization(
 
         history.append(target_fitness)
 
+        # บันทึกตำแหน่งทุก agent (สำหรับ animation)
+        if track_positions:
+            positions_history.append(grasshoppers.copy())
+
+    if track_positions:
+        return target, target_fitness, history, positions_history
     return target, target_fitness, history
 
 

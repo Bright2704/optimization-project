@@ -25,7 +25,8 @@ def genetic_algorithm(
     max_iter=100,       # จำนวน generations
     crossover_rate=0.8, # อัตราการ crossover (p_c)
     mutation_rate=0.1,  # อัตราการ mutation (p_m)
-    seed=None           # random seed
+    seed=None,          # random seed
+    track_positions=False  # เก็บประวัติตำแหน่งทุก agent (สำหรับ animation)
 ):
     """
     Genetic Algorithm (Real-Number Version)
@@ -34,6 +35,7 @@ def genetic_algorithm(
         best_position: ตำแหน่งที่ดีที่สุด
         best_fitness: ค่า fitness ที่ดีที่สุด
         history: ประวัติค่า fitness ที่ดีที่สุดในแต่ละ generation
+        positions_history: (optional) ตำแหน่งของทุก agent ในแต่ละ generation
     """
     if seed is not None:
         np.random.seed(seed)
@@ -52,6 +54,11 @@ def genetic_algorithm(
     global_best_fitness = fitness_values[best_idx]
 
     history = [global_best_fitness]
+    positions_history = []  # สำหรับ animation
+
+    # บันทึกตำแหน่งเริ่มต้น
+    if track_positions:
+        positions_history.append(population.copy())
 
     # === Step 2: Main Loop (Generations) ===
     for generation in range(max_iter):
@@ -119,6 +126,12 @@ def genetic_algorithm(
 
         history.append(global_best_fitness)
 
+        # บันทึกตำแหน่งทุก agent (สำหรับ animation)
+        if track_positions:
+            positions_history.append(population.copy())
+
+    if track_positions:
+        return global_best, global_best_fitness, history, positions_history
     return global_best, global_best_fitness, history
 
 

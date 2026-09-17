@@ -4,6 +4,7 @@
     ==========================================
     โค้ด JavaScript แบบง่ายๆ สำหรับควบคุมหน้าเว็บ
     + ระบบ 2 ภาษา (ไทย/อังกฤษ)
+    + Animation สำหรับแสดงการเคลื่อนที่ของ agents
 =============================================================================
 */
 
@@ -14,6 +15,14 @@
 let currentResult = null;
 let comparisonResults = [];
 let currentLang = 'th';  // ภาษาเริ่มต้น
+
+// Animation variables
+let animationData = null;      // ข้อมูล animation จาก API
+let currentFrame = 0;          // frame ปัจจุบัน
+let isPlaying = false;         // สถานะ play/pause
+let animationInterval = null;  // interval ID
+let animationSpeed = 1;        // ความเร็ว animation (1 = ปกติ)
+let contourData = null;        // ข้อมูล contour สำหรับ background
 
 // =============================================================================
 // Language System - ระบบเปลี่ยนภาษา
@@ -405,4 +414,314 @@ function updateConvergencePlotMultiple(allHistories) {
     };
 
     Plotly.newPlot('convergence-plot', traces, layout, { responsive: true });
+}
+
+// =============================================================================
+// Animation Functions - แสดงการเคลื่อนที่ของ agents
+// =============================================================================
+
+/**
+ * รัน Animation - โหลดข้อมูลและเริ่มแสดงผล
+ */
+async function runAnimation() {
+    const algorithm = document.getElementById('algorithm').value;
+    const func = document.getElementById('function').value;
+    const nAgents = document.getElementById('n-agents').value;
+    const maxIter = document.getElementById('max-iter').value;
+
+    // Show loading
+    const loadingText = currentLang === 'th' ? 'กำลังโหลด Animation...' : 'Loading Animation...';
+    document.getElementById('result-content').innerHTML = `<p>${loadingText} <span class="loading"></span></p>`;
+
+    try {
+        // Fetch animation data
+        const response = await fetch('/api/run_animation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                algorithm: algorithm,
+                function: func,
+                n_agents: nAgents,
+                max_iter: maxIter
+            })
+        });
+
+        animationData = await response.json();
+
+        // Fetch contour data for background
+        const contourResponse = await fetch('/api/contour', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ function: func })
+        });
+        contourData = await contourResponse.json();
+
+        // Setup animation
+        currentFrame = 0;
+        isPlaying = false;
+
+        // Update UI
+        document.getElementById('animation-section').style.display = 'block';
+        document.getElementById('total-iterations').textContent = animationData.n_frames - 1;
+        document.getElementById('iteration-slider').max = animationData.n_frames - 1;
+        document.getElementById('iteration-slider').value = 0;
+
+        // Display result
+        displayResult(animationData);
+
+        // Create snapshots
+        createSnapshots();
+
+        // Draw initial frame
+        drawAnimationFrame(0);
+
+        // Scroll to animation section
+        document.getElementById('animation-section').scrollIntoView({ behavior: 'smooth' });
+
+        const readyText = currentLang === 'th' ? 'พร้อมแสดง Animation แล้ว! กด Play เพื่อเริ่ม' : 'Animation ready! Press Play to start';
+        document.getElementById('result-content').innerHTML = `<p>${readyText}</p>`;
+
+    } catch (error) {
+        const errorText = currentLang === 'th' ? 'เกิดข้อผิดพลาด:' : 'Error:';
+        document.getElementById('result-content').innerHTML =
+            `<p style="color:red;">${errorText} ${error.message}</p>`;
+    }
+}
+
+/**
+ * วาด frame ที่ระบุ - แบบง่าย ดูชัด
+ */
+function drawAnimationFrame(frameIndex) {
+    if (!animationData || !contourData) return;
+
+    const frame = animationData.frames[frameIndex];
+    const bounds = animationData.bounds;
+    const traces = [];
+
+    // 1. พื้นหลัง Contour (สีอ่อนๆ)
+    traces.push({
+        x: contourData.x,
+        y: contourData.y,
+        z: contourData.z,
+        type: 'contour',
+        colorscale: [
+            [0, '#f0f4ff'],
+            [0.5, '#a8c0ff'],
+            [1, '#3f5efb']
+        ],
+        contours: { coloring: 'heatmap' },
+        showscale: false,
+        opacity: 0.6,
+        hoverinfo: 'skip'
+    });
+
+    // 2. เส้นทางการเคลื่อนที่ (Trail) - แสดง 5 frames ล่าสุด
+    if (frameIndex > 0) {
+        const trailStart = Math.max(0, frameIndex - 5);
+        for (let i = trailStart; i < frameIndex; i++) {
+            const pastFrame = animationData.frames[i];
+            const opacity = 0.1 + (i - trailStart) * 0.1;
+            traces.push({
+                x: pastFrame.map(p => p[0]),
+                y: pastFrame.map(p => p[1]),
+                mode: 'markers',
+                type: 'scatter',
+                marker: {
+                    size: 8,
+                    color: `rgba(150, 150, 150, ${opacity})`,
+                    symbol: 'circle'
+                },
+                showlegend: false,
+                hoverinfo: 'skip'
+            });
+        }
+    }
+
+    // 3. Agents ปัจจุบัน (จุดแดงใหญ่ชัด)
+    const agentLabel = currentLang === 'th' ? '🔴 Agents ปัจจุบัน' : '🔴 Current Agents';
+    traces.push({
+        x: frame.map(p => p[0]),
+        y: frame.map(p => p[1]),
+        mode: 'markers',
+        type: 'scatter',
+        marker: {
+            size: 16,
+            color: '#e74c3c',
+            symbol: 'circle',
+            line: { width: 3, color: 'white' }
+        },
+        name: agentLabel
+    });
+
+    // 4. จุดเป้าหมาย (Target) - สีเขียว
+    const targetLabel = currentLang === 'th' ? '🎯 เป้าหมาย' : '🎯 Target';
+    traces.push({
+        x: [animationData.position[0]],
+        y: [animationData.position[1]],
+        mode: 'markers',
+        type: 'scatter',
+        marker: {
+            size: 25,
+            color: '#2ecc71',
+            symbol: 'star',
+            line: { width: 3, color: '#27ae60' }
+        },
+        name: targetLabel
+    });
+
+    // Layout ที่ดูง่าย
+    const iterLabel = currentLang === 'th' ? 'รอบที่' : 'Iteration';
+    const layout = {
+        margin: { t: 50, r: 20, b: 50, l: 50 },
+        xaxis: {
+            title: { text: 'X', font: { size: 16, color: '#333' } },
+            range: [bounds[0] * 1.1, bounds[1] * 1.1],
+            gridcolor: '#eee',
+            zerolinecolor: '#999',
+            zerolinewidth: 2
+        },
+        yaxis: {
+            title: { text: 'Y', font: { size: 16, color: '#333' } },
+            range: [bounds[0] * 1.1, bounds[1] * 1.1],
+            gridcolor: '#eee',
+            zerolinecolor: '#999',
+            zerolinewidth: 2
+        },
+        title: {
+            text: `<b>${animationData.algorithm}</b> - ${iterLabel} <b>${frameIndex}</b>/${animationData.n_frames - 1}`,
+            font: { size: 18 }
+        },
+        showlegend: true,
+        legend: {
+            x: 0.02,
+            y: 0.98,
+            bgcolor: 'rgba(255,255,255,0.9)',
+            bordercolor: '#ddd',
+            borderwidth: 1
+        },
+        plot_bgcolor: 'white',
+        paper_bgcolor: 'white'
+    };
+
+    Plotly.newPlot('animation-plot', traces, layout, { responsive: true });
+
+    // Update UI
+    document.getElementById('current-iteration').textContent = frameIndex;
+    document.getElementById('iteration-slider').value = frameIndex;
+
+    if (animationData.history[frameIndex] !== undefined) {
+        document.getElementById('current-fitness').textContent = animationData.history[frameIndex].toFixed(6);
+    }
+
+    updateSnapshotHighlight(frameIndex);
+}
+
+/**
+ * หา index ของ agent ที่ดีที่สุดใน frame (fitness ต่ำสุด)
+ */
+function findBestInFrame(frame) {
+    // ใช้ fitness function approximation (Sphere for simplicity)
+    let bestIdx = 0;
+    let bestFit = Infinity;
+
+    for (let i = 0; i < frame.length; i++) {
+        const fit = frame[i][0]**2 + frame[i][1]**2;
+        if (fit < bestFit) {
+            bestFit = fit;
+            bestIdx = i;
+        }
+    }
+    return bestIdx;
+}
+
+/**
+ * Play animation
+ */
+function playAnimation() {
+    if (!animationData) return;
+
+    isPlaying = true;
+    document.getElementById('play-btn').disabled = true;
+    document.getElementById('pause-btn').disabled = false;
+
+    const interval = 500 / animationSpeed; // ms per frame
+
+    animationInterval = setInterval(() => {
+        if (currentFrame >= animationData.n_frames - 1) {
+            pauseAnimation();
+            return;
+        }
+        currentFrame++;
+        drawAnimationFrame(currentFrame);
+    }, interval);
+}
+
+/**
+ * Pause animation
+ */
+function pauseAnimation() {
+    isPlaying = false;
+    document.getElementById('play-btn').disabled = false;
+    document.getElementById('pause-btn').disabled = true;
+
+    if (animationInterval) {
+        clearInterval(animationInterval);
+        animationInterval = null;
+    }
+}
+
+/**
+ * Reset animation to frame 0
+ */
+function resetAnimation() {
+    pauseAnimation();
+    currentFrame = 0;
+    drawAnimationFrame(0);
+}
+
+/**
+ * Step to next frame
+ */
+function stepAnimation() {
+    pauseAnimation();
+    if (animationData && currentFrame < animationData.n_frames - 1) {
+        currentFrame++;
+        drawAnimationFrame(currentFrame);
+    }
+}
+
+/**
+ * Seek to specific frame (from slider)
+ */
+function seekAnimation(frameIndex) {
+    pauseAnimation();
+    currentFrame = parseInt(frameIndex);
+    drawAnimationFrame(currentFrame);
+}
+
+/**
+ * Update animation speed
+ */
+function updateSpeed() {
+    animationSpeed = parseFloat(document.getElementById('animation-speed').value);
+
+    // If playing, restart with new speed
+    if (isPlaying) {
+        pauseAnimation();
+        playAnimation();
+    }
+}
+
+/**
+ * Create snapshot thumbnails (ไม่ใช้แล้ว แต่เก็บไว้)
+ */
+function createSnapshots() {
+    // ไม่ต้องทำอะไร - ใช้ quick jump buttons แทน
+}
+
+/**
+ * Update snapshot highlight (ไม่ใช้แล้ว แต่เก็บไว้)
+ */
+function updateSnapshotHighlight(frameIndex) {
+    // ไม่ต้องทำอะไร
 }
