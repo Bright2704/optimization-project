@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -68,6 +69,9 @@ def run_benchmarks(
                     "best_fitness": float(fitness),
                     "best_position_norm": float(np.linalg.norm(position)),
                     "convergence": np.asarray(optimizer.convergence_curve, dtype=float),
+                    "runtime_seconds": optimizer.result.runtime_seconds,
+                    "evaluation_count": optimizer.evaluation_count,
+                    "configuration": {"dimensions": dimensions, "agents": agents, "iterations": iterations, "bounds": [lower, upper]},
                 }
             )
             print(f"{name:<10} run {run_index + 1}/{runs}: {fitness:.8g}")
@@ -79,11 +83,11 @@ def run_benchmarks(
 
 
 def _write_csv(records: list[dict], path: Path) -> None:
-    fields = ("benchmark", "run", "seed", "best_fitness", "best_position_norm")
+    fields = ("benchmark", "run", "seed", "best_fitness", "best_position_norm", "runtime_seconds", "evaluation_count", "configuration", "convergence")
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
-        writer.writerows({key: record[key] for key in fields} for record in records)
+        writer.writerows({key: json.dumps(record[key].tolist()) if key == "convergence" else json.dumps(record[key]) if key == "configuration" else record[key] for key in fields} for record in records)
 
 
 def _plot_convergence(records: list[dict], path: Path) -> None:
@@ -91,20 +95,20 @@ def _plot_convergence(records: list[dict], path: Path) -> None:
     for name in BENCHMARKS:
         curves = np.stack([r["convergence"] for r in records if r["benchmark"] == name])
         mean = curves.mean(axis=0)
-        std = curves.std(axis=0)
+        std = curves.std(axis=0, ddof=1) if len(curves)>1 else np.zeros_like(mean)
         x = np.arange(mean.size)
-        safe_mean = np.maximum(mean, np.finfo(float).tiny)
+        safe_mean = np.maximum(mean, 1e-16)
         axis.plot(x, safe_mean, linewidth=2, label=name)
         axis.fill_between(
             x,
-            np.maximum(mean - std, np.finfo(float).tiny),
-            np.maximum(mean + std, np.finfo(float).tiny),
+            np.maximum(mean - std, 1e-16),
+            np.maximum(mean + std, 1e-16),
             alpha=0.16,
         )
     axis.set(
-        title="GOA benchmark convergence",
+        title="GOA benchmark convergence (display floor ε=1e-16 only)",
         xlabel="Iteration",
-        ylabel="Best fitness (mean ± SD)",
+        ylabel="Best-so-far across independent runs (mean ± sample SD)",
     )
     axis.set_yscale("log")
     axis.grid(True, which="both", alpha=0.25)
@@ -120,9 +124,9 @@ def _plot_summary(records: list[dict], path: Path) -> None:
         [r["best_fitness"] for r in records if r["benchmark"] == name] for name in names
     ]
     figure, axis = plt.subplots(figsize=(9, 5.5))
-    axis.boxplot(samples, tick_labels=names, showmeans=True)
+    axis.boxplot([np.maximum(sample,1e-16) for sample in samples], tick_labels=names, showmeans=True)
     axis.set(
-        title="Final fitness across independent runs",
+        title="Final fitness across independent runs (display floor ε=1e-16 only)",
         ylabel="Best fitness (lower is better)",
     )
     axis.set_yscale("log")

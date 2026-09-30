@@ -1,0 +1,14 @@
+{
+  "status": "reviewed",
+  "method": "Inspection of actual rendered PDF contact sheet and detailed slide images; inspection of browser and decoded animation images",
+  "pages_reviewed": 12,
+  "corrections": [
+    "Enlarged plot labels for paired slide panels",
+    "Enlarged snapshot iteration and legend text",
+    "Moved animation hyperlinks below formula and chart to remove overlap",
+    "Moved strip contour transformation caption into title to prevent legend overlap"
+  ],
+  "current_slide_table_matches_measured_data": true,
+  "remaining_observed_overflow_or_overlap": [],
+  "timing_note": "720-second allocation; not an actual presenter rehearsal"
+}

@@ -1,0 +1,66 @@
+{
+  "slides": [
+    {
+      "slide": 1,
+      "title": "GOA: from swarm to measured evidence",
+      "seconds": 60
+    },
+    {
+      "slide": 2,
+      "title": "The GOA update rule",
+      "seconds": 75
+    },
+    {
+      "slide": 3,
+      "title": "Exploration \u2192 exploitation",
+      "seconds": 65
+    },
+    {
+      "slide": 4,
+      "title": "Where GOA can be applied",
+      "seconds": 50
+    },
+    {
+      "slide": 5,
+      "title": "A reproducible comparison",
+      "seconds": 70
+    },
+    {
+      "slide": 6,
+      "title": "Sphere: a smooth bowl",
+      "seconds": 75
+    },
+    {
+      "slide": 7,
+      "title": "Rosenbrock: a narrow curved valley",
+      "seconds": 90
+    },
+    {
+      "slide": 8,
+      "title": "Mean convergence and optimality gap",
+      "seconds": 70
+    },
+    {
+      "slide": 9,
+      "title": "Typical performance and run variability",
+      "seconds": 70
+    },
+    {
+      "slide": 10,
+      "title": "What the 180 runs show",
+      "seconds": 50
+    },
+    {
+      "slide": 11,
+      "title": "Limits and conclusions",
+      "seconds": 35
+    },
+    {
+      "slide": 12,
+      "title": "References & reproducibility",
+      "seconds": 10
+    }
+  ],
+  "total_seconds": 720,
+  "qa_included_in_talk_time": false
+}

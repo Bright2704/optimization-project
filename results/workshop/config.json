@@ -1,0 +1,62 @@
+{
+  "dimensions": 2,
+  "runs_per_algorithm_function": 30,
+  "agents": 30,
+  "iterations": 100,
+  "base_seed": 20260930,
+  "algorithms": [
+    "goa",
+    "ga",
+    "rls"
+  ],
+  "parameters": {
+    "goa": {
+      "c_max": 1.0,
+      "c_min": 1e-05,
+      "f": 0.5,
+      "l": 1.5
+    },
+    "ga": {
+      "crossover_rate": 0.8,
+      "mutation_rate": 0.1
+    },
+    "rls": {
+      "step_size": 0.3
+    }
+  },
+  "bounds": {
+    "sphere": [
+      -5.0,
+      5.0
+    ],
+    "rosenbrock": [
+      -2.0,
+      2.0
+    ]
+  },
+  "known_optima": {
+    "sphere": {
+      "position": [
+        0.0,
+        0.0
+      ],
+      "fitness": 0.0
+    },
+    "rosenbrock": {
+      "position": [
+        1.0,
+        1.0
+      ],
+      "fitness": 0.0
+    }
+  },
+  "seed_schedule": "base_seed + 10000 * function_index + run_index (0-based); same seeds across algorithms",
+  "animation_seed": 424242,
+  "comparison": "equal iterations AND equal actual objective evaluations after caching; N*(T+1)",
+  "fitness_definition": "minimum objective value among all evaluated points through iteration t",
+  "rng": "numpy.random.default_rng / PCG64; no global RNG mutation",
+  "runtime_definition": "perf_counter, initialization + search + trace storage; excludes plotting, files, animation",
+  "algorithm_order": "rotate goa,ga,rls by run index; warm up each outside timed records",
+  "sd_definition": "sample SD, ddof=1 (0 for a single run)",
+  "display_epsilon": 1e-16
+}

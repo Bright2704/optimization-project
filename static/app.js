@@ -57,6 +57,7 @@ function setLanguage(lang) {
 
     // Update function info
     updateFunctionInfo();
+    if (animationData) drawAnimationFrame(currentFrame);
 
     // Save preference
     localStorage.setItem('lang', lang);
@@ -92,6 +93,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update function info when changed
     document.getElementById('function').addEventListener('change', function() {
         updateFunctionInfo();
+        pauseAnimation();
+        document.getElementById('animation-section').style.display = 'none';
         updateContourPlot();
     });
 
@@ -125,11 +128,13 @@ async function runAlgorithm() {
                 algorithm: algorithm,
                 function: func,
                 n_agents: nAgents,
+                seed: document.getElementById('seed').value,
                 max_iter: maxIter
             })
         });
 
         const result = await response.json();
+        if (!response.ok) throw new Error(result.error);
         currentResult = result;
 
         displayResult(result);
@@ -167,11 +172,13 @@ async function compareAll() {
                     algorithm: algo,
                     function: func,
                     n_agents: nAgents,
+                seed: document.getElementById('seed').value,
                     max_iter: maxIter
                 })
             });
 
             const result = await response.json();
+        if (!response.ok) throw new Error(result.error);
             comparisonResults.push(result);
             allHistories.push({
                 name: result.algorithm,
@@ -210,7 +217,8 @@ function displayResult(result) {
         <p><strong>${L.algo}:</strong> <span class="highlight">${result.algorithm}</span></p>
         <p><strong>${L.func}:</strong> ${result.function}</p>
         <p><strong>${L.pos}:</strong> [${result.position[0].toFixed(4)}, ${result.position[1].toFixed(4)}]</p>
-        <p><strong>${L.fit}:</strong> <span class="highlight">${result.fitness.toFixed(8)}</span></p>
+        <p>Seed: ${result.seed} · Evaluations: ${result.evaluation_count} · Runtime: ${result.runtime_seconds.toFixed(4)} s</p>
+        <p><strong>${L.fit}:</strong> <span class="highlight">${result.fitness.toExponential(4)}</span></p>
     `;
     document.getElementById('result-content').innerHTML = html;
 }
@@ -236,11 +244,11 @@ function displayComparisonTable() {
     let html = '';
     comparisonResults.forEach((r, i) => {
         const isWinner = i === winnerIdx;
-        const winnerLabel = currentLang === 'th' ? '🏆 ชนะ' : '🏆 Winner';
+        const winnerLabel = currentLang === 'th' ? 'ค่าต่ำสุดในตัวอย่างรันเดียว' : 'Lowest in this single run';
         html += `
             <tr class="${isWinner ? 'winner' : ''}">
                 <td>${r.algorithm} ${isWinner ? winnerLabel : ''}</td>
-                <td>${r.fitness.toFixed(8)}</td>
+                <td>${r.fitness.toExponential(4)}</td>
                 <td>[${r.position[0].toFixed(4)}, ${r.position[1].toFixed(4)}]</td>
             </tr>
         `;
@@ -305,7 +313,7 @@ async function updateContourPlot() {
         const trace = {
             x: data.x,
             y: data.y,
-            z: data.z,
+            z: data.color_z || data.z,
             type: 'contour',
             colorscale: 'Viridis',
             contours: { coloring: 'heatmap' }
@@ -317,7 +325,9 @@ async function updateContourPlot() {
             yaxis: { title: 'x₂' }
         };
 
-        Plotly.newPlot('contour-plot', [trace], layout, { responsive: true });
+        layout.title = {text: `Color: ${data.color_transform}`, font: {size: 13}};
+        const optimum = {x: [data.known_optimum.position[0]], y: [data.known_optimum.position[1]], mode: 'markers', type: 'scatter', name: 'Known optimum', marker: {color: '#2ecc71', size: 15, symbol: 'star'}};
+        Plotly.newPlot('contour-plot', [trace, optimum], layout, { responsive: true });
 
     } catch (error) {
         console.error('Error updating contour:', error);
@@ -340,7 +350,7 @@ function updateContourWithPoint(position, bounds) {
         const contour = {
             x: data.x,
             y: data.y,
-            z: data.z,
+            z: data.color_z || data.z,
             type: 'contour',
             colorscale: 'Viridis',
             contours: { coloring: 'heatmap' },
@@ -364,7 +374,9 @@ function updateContourWithPoint(position, bounds) {
             showlegend: true
         };
 
-        Plotly.newPlot('contour-plot', [contour, point], layout, { responsive: true });
+        layout.title = {text: `Color: ${data.color_transform}`, font: {size: 13}};
+        const optimum = {x: [data.known_optimum.position[0]], y: [data.known_optimum.position[1]], mode: 'markers', type: 'scatter', name: 'Known optimum', marker: {color: '#2ecc71', size: 15, symbol: 'star'}};
+        Plotly.newPlot('contour-plot', [contour, optimum, point], layout, { responsive: true });
     });
 }
 
@@ -373,14 +385,15 @@ function updateContourWithPoint(position, bounds) {
  */
 function updateConvergencePlot(history, name) {
     const trace = {
-        y: history,
+        x: history.map((_, i) => i),
+        y: history.map(v => Math.max(v, 1e-16)),
         mode: 'lines',
         name: name,
         line: { width: 2 }
     };
 
     const xLabel = currentLang === 'th' ? 'รอบที่' : 'Iteration';
-    const yLabel = currentLang === 'th' ? 'Fitness ที่ดีที่สุด' : 'Best Fitness';
+    const yLabel = currentLang === 'th' ? 'Best-so-far (รันเดียว; log display floor 1e-16)' : 'Best-so-far (single run; log display floor 1e-16)';
 
     const layout = {
         margin: { t: 10, r: 10, b: 40, l: 50 },
@@ -397,14 +410,15 @@ function updateConvergencePlot(history, name) {
 function updateConvergencePlotMultiple(allHistories) {
     const colors = ['#e74c3c', '#3498db', '#2ecc71'];
     const traces = allHistories.map((h, i) => ({
-        y: h.history,
+        x: h.history.map((_, i) => i),
+        y: h.history.map(v => Math.max(v, 1e-16)),
         mode: 'lines',
         name: h.name,
         line: { width: 2, color: colors[i] }
     }));
 
     const xLabel = currentLang === 'th' ? 'รอบที่' : 'Iteration';
-    const yLabel = currentLang === 'th' ? 'Fitness ที่ดีที่สุด' : 'Best Fitness';
+    const yLabel = currentLang === 'th' ? 'Best-so-far (รันเดียว; log display floor 1e-16)' : 'Best-so-far (single run; log display floor 1e-16)';
 
     const layout = {
         margin: { t: 10, r: 10, b: 40, l: 50 },
@@ -424,6 +438,11 @@ function updateConvergencePlotMultiple(allHistories) {
  * รัน Animation - โหลดข้อมูลและเริ่มแสดงผล
  */
 async function runAnimation() {
+    pauseAnimation();
+    const panel = document.getElementById('animation-section');
+    panel.dataset.loading = 'true';
+    panel.style.display = 'none';
+    document.getElementById('animation-btn').disabled = true;
     const algorithm = document.getElementById('algorithm').value;
     const func = document.getElementById('function').value;
     const nAgents = document.getElementById('n-agents').value;
@@ -442,11 +461,14 @@ async function runAnimation() {
                 algorithm: algorithm,
                 function: func,
                 n_agents: nAgents,
+                seed: document.getElementById('seed').value,
                 max_iter: maxIter
             })
         });
 
+        pauseAnimation();
         animationData = await response.json();
+        if (!response.ok) throw new Error(animationData.error);
 
         // Fetch contour data for background
         const contourResponse = await fetch('/api/contour', {
@@ -474,6 +496,7 @@ async function runAnimation() {
 
         // Draw initial frame
         drawAnimationFrame(0);
+        panel.dataset.loading = 'false';
 
         // Scroll to animation section
         document.getElementById('animation-section').scrollIntoView({ behavior: 'smooth' });
@@ -485,6 +508,8 @@ async function runAnimation() {
         const errorText = currentLang === 'th' ? 'เกิดข้อผิดพลาด:' : 'Error:';
         document.getElementById('result-content').innerHTML =
             `<p style="color:red;">${errorText} ${error.message}</p>`;
+    } finally {
+        document.getElementById('animation-btn').disabled = false;
     }
 }
 
@@ -502,7 +527,7 @@ function drawAnimationFrame(frameIndex) {
     traces.push({
         x: contourData.x,
         y: contourData.y,
-        z: contourData.z,
+        z: contourData.color_z || contourData.z,
         type: 'contour',
         colorscale: [
             [0, '#f0f4ff'],
@@ -553,20 +578,19 @@ function drawAnimationFrame(frameIndex) {
         name: agentLabel
     });
 
-    // 4. จุดเป้าหมาย (Target) - สีเขียว
-    const targetLabel = currentLang === 'th' ? '🎯 เป้าหมาย' : '🎯 Target';
+    // Known mathematical optimum is independent of the optimizer's result.
     traces.push({
-        x: [animationData.position[0]],
-        y: [animationData.position[1]],
-        mode: 'markers',
-        type: 'scatter',
-        marker: {
-            size: 25,
-            color: '#2ecc71',
-            symbol: 'star',
-            line: { width: 3, color: '#27ae60' }
-        },
-        name: targetLabel
+        x: [animationData.known_optimum.position[0]],
+        y: [animationData.known_optimum.position[1]],
+        mode: 'markers', type: 'scatter',
+        marker: {size: 24, color: '#2ecc71', symbol: 'star', line: {width: 2, color: '#16713c'}},
+        name: currentLang === 'th' ? 'Known optimum (ค่าที่ทราบจากสูตร)' : 'Known optimum'
+    });
+    const best = animationData.best_positions_history[frameIndex];
+    traces.push({
+        x: [best[0]], y: [best[1]], mode: 'markers', type: 'scatter',
+        marker: {size: 18, color: '#ffb000', symbol: 'diamond-open', line: {width: 3}},
+        name: 'Best-so-far (archive through this iteration)'
     });
 
     // Layout ที่ดูง่าย
@@ -588,7 +612,7 @@ function drawAnimationFrame(frameIndex) {
             zerolinewidth: 2
         },
         title: {
-            text: `<b>${animationData.algorithm}</b> - ${iterLabel} <b>${frameIndex}</b>/${animationData.n_frames - 1}`,
+            text: `<b>${animationData.algorithm}</b> · ${animationData.function} · seed ${animationData.seed}<br>${iterLabel} ${frameIndex}/${animationData.n_frames - 1} · color: ${contourData.color_transform}`,
             font: { size: 18 }
         },
         showlegend: true,
@@ -610,36 +634,18 @@ function drawAnimationFrame(frameIndex) {
     document.getElementById('iteration-slider').value = frameIndex;
 
     if (animationData.history[frameIndex] !== undefined) {
-        document.getElementById('current-fitness').textContent = animationData.history[frameIndex].toFixed(6);
+        document.getElementById('current-fitness').textContent = animationData.history[frameIndex].toExponential(4);
     }
 
     updateSnapshotHighlight(frameIndex);
 }
 
 /**
- * หา index ของ agent ที่ดีที่สุดใน frame (fitness ต่ำสุด)
- */
-function findBestInFrame(frame) {
-    // ใช้ fitness function approximation (Sphere for simplicity)
-    let bestIdx = 0;
-    let bestFit = Infinity;
-
-    for (let i = 0; i < frame.length; i++) {
-        const fit = frame[i][0]**2 + frame[i][1]**2;
-        if (fit < bestFit) {
-            bestFit = fit;
-            bestIdx = i;
-        }
-    }
-    return bestIdx;
-}
-
-/**
  * Play animation
  */
 function playAnimation() {
-    if (!animationData) return;
-
+    if (!animationData || isPlaying) return;
+    if (currentFrame >= animationData.n_frames - 1) currentFrame = 0;
     isPlaying = true;
     document.getElementById('play-btn').disabled = true;
     document.getElementById('pause-btn').disabled = false;
@@ -695,7 +701,8 @@ function stepAnimation() {
  */
 function seekAnimation(frameIndex) {
     pauseAnimation();
-    currentFrame = parseInt(frameIndex);
+    if (!animationData) return;
+    currentFrame = Math.max(0, Math.min(parseInt(frameIndex), animationData.n_frames - 1));
     drawAnimationFrame(currentFrame);
 }
 

@@ -1,0 +1,89 @@
+"""Thai speaking script and Q&A, populated from measured summary statistics."""
+import json
+from pathlib import Path
+from workshop.experiments import save_json
+
+
+def write_narrative(root,output):
+    rows=json.loads((root/'summary.json').read_text()); lookup={(r['function'],r['algorithm']):r for r in rows}
+    sg=lookup['sphere','goa'];rg=lookup['rosenbrock','goa']; rr=lookup['rosenbrock','rls']
+    from workshop.presentation import TIMES,TITLES
+    scripts=[
+'''สวัสดีครับ วันนี้นำเสนอ Grasshopper Optimisation Algorithm หรือ GOA โดยตั้งคำถามว่า การเลียนแบบปฏิสัมพันธ์ในฝูงตั๊กแตนสามารถช่วยหาค่าต่ำสุดของฟังก์ชันได้อย่างไร และเมื่อทดลองจริงแล้วได้ผลดีแค่ไหน งานนี้มีสามส่วน คืออธิบายกลไก ดูภาพการเคลื่อนที่ และเปรียบเทียบกับวิธีที่มีอยู่ในโปรเจกต์ ได้แก่ Genetic Algorithm และ Random Local Search
+
+คำว่า optimization ในที่นี้คือการหาตำแหน่ง x ที่ทำให้ objective มีค่าต่ำที่สุด ภายในขอบเขตที่กำหนด เรารู้สูตรของฟังก์ชันสำหรับการสาธิต แต่ algorithm ได้รับเพียงตัวประเมินค่า fitness ไม่ได้รับตำแหน่งคำตอบจริง เราใช้ Sphere และ Rosenbrock ในสองมิติ เพื่อดูตำแหน่ง agents บน contour ได้ชัด และทำซ้ำทั้งหมด 180 runs เพื่อไม่ให้ข้อสรุปขึ้นอยู่กับการสุ่มเพียงครั้งเดียว ระหว่างการนำเสนอจะใช้คำว่า “ดีในชุดทดลองนี้” เพราะหลักฐานยังไม่ครอบคลุมทุกปัญหา''',
+'''สมการแรกคือ social force ซึ่งขึ้นอยู่กับระยะ r พารามิเตอร์ในงานนี้เป็น f เท่ากับ 0.5 และ l เท่ากับ 1.5 เมื่อระยะใกล้ ค่าแรงอาจเป็นลบและทำให้ผลักกัน เมื่อระยะมากขึ้น ค่าแรงเป็นบวกและทำให้ดึงดูดกัน จุดที่แรงเป็นศูนย์อยู่ประมาณ 2.079 ในระยะที่ normalize แล้ว เป็นผลจากการแก้สมการ s เท่ากับศูนย์
+
+สมการอัปเดตมีสองส่วน ส่วนแรกเป็นผลรวมปฏิสัมพันธ์กับ agents ตัวอื่น ส่วนที่สองคือ T หรือคำตอบที่ดีที่สุดที่เคยประเมินได้ ขอเน้นว่า T เป็น best-so-far ไม่ใช่คำตอบจริงที่เรารู้จากทฤษฎี ทิศ u ชี้จาก agent i ไป agent j และหารด้วยระยะ Euclidean ของคู่ดังกล่าว มี c สองตัว ตัวหนึ่งอยู่ในผลรวม อีกตัวอยู่นอกผลรวม และมีตัวคูณครึ่งหนึ่งของความกว้างขอบเขต เราเก็บองค์ประกอบเหล่านี้ครบในแกนโปรแกรมเดียวกัน แล้วใช้แกนนั้นทั้งการทดลองและภาพเคลื่อนไหว ค่า c ลดลงเชิงเส้นตามสมการที่เห็น ตั้งแต่ update แรกจนถึง 10 ยกกำลังลบห้าใน update ที่ 100''',
+'''ช่วงต้น ค่า c ยังสูง ปฏิสัมพันธ์จึงทำให้ agents เคลื่อนที่กว้างขึ้น เพื่อสำรวจบริเวณต่าง ๆ หรือ exploration การผลักเมื่อใกล้กันช่วยกระจายฝูง ส่วนการดึงดูดและ target ช่วยให้ agents หาบริเวณที่น่าสนใจ ช่วงท้ายค่า c ต่ำลง การเคลื่อนที่รอบ best-so-far เล็กลง จึงเน้น exploitation หรือปรับคำตอบในพื้นที่ที่เลือกไว้
+
+สมการด้านล่างแสดงวิธี normalize ที่ใช้จริง เรานำระยะห่างของแต่ละพิกัดหารด้วยความกว้างของขอบเขต แล้ว map ไปช่วงหนึ่งถึงสี่ สูตรนี้เป็นทางเลือกของ implementation ที่ระบุไว้อย่างชัดเจน Paper บอกให้ normalize ระยะไปช่วงนี้ แต่ไม่ได้ทำให้ทุกวิธี normalize ที่เป็นไปได้มีผลเหมือนกัน เราจึงไม่อ้างว่าโค้ดเป็นการทำซ้ำ paper ทุกประการ อีกทางเลือกคือ update แบบ synchronous คือคำนวณตำแหน่งใหม่ทุกตัวจากประชากรเก่าชุดเดียวกัน แล้ว clip หากออกนอก bounds ประเด็นที่ควรจำคือ ฝูงที่รวมกันแน่นอาจรวมกันรอบคำตอบที่ยังไม่ถูกต้องได้ การลด c ไม่ได้เป็นหลักฐานรับประกัน global optimum''',
+'''ตัวอย่างการประยุกต์ใช้ใน paper คือการออกแบบโครงสร้าง โดยตัวแปรเป็นพื้นที่หน้าตัดของชิ้นส่วน เป้าหมายคือลดน้ำหนัก และมีเงื่อนไขด้านความเค้นหรือการโก่งตัว ผู้ประเมิน candidate จะต้องคำนวณทั้งน้ำหนักและตรวจเงื่อนไขเหล่านี้ ก่อนตัดสินว่าตำแหน่งใหม่ดีขึ้นหรือไม่
+
+ข้อดีเชิงวิธีการคือ GOA ไม่ต้องใช้ gradient จึงอาจเหมาะกับ objective ที่คำนวณจาก simulation หรือมีสูตรอนุพันธ์ที่ใช้ยาก อย่างไรก็ตาม เรื่องนี้ไม่ได้แปลว่า GOA จะเร็วกว่าวิธีที่ใช้ gradient เสมอ งานที่เราทำวันนี้ยังไม่ได้ทดลองโครงสร้างจริง และไม่ได้เพิ่ม constraints ใน Sphere หรือ Rosenbrock จึงใช้ตัวอย่างนี้เพื่ออธิบายว่าต้องต่อ algorithm เข้ากับปัญหาจริงอย่างไรเท่านั้น ผลเชิงประสิทธิภาพที่จะพูดต่อไปมาจากฟังก์ชันทดสอบสองแบบของเรา ไม่ใช่ผลการออกแบบวิศวกรรมใหม่''',
+'''การทดลองหลักใช้สองมิติ จำนวน agents สามสิบ และ updates หนึ่งร้อย ทุก method ใช้ขอบเขตเดียวกันภายในแต่ละฟังก์ชัน คือ Sphere ลบห้าถึงห้า และ Rosenbrock ลบสองถึงสอง แต่ละคู่ method กับฟังก์ชันทำสามสิบ independent runs ตาราง seed กำหนดก่อนรัน และ seed เดียวกันข้าม methods ทำให้เริ่มจากตำแหน่งประชากรเดียวกัน ส่วนการสุ่มต่อจากนั้นเป็นของแต่ละ algorithm
+
+การเทียบจำนวนรอบอย่างเดียวอาจไม่ยุติธรรม จึงนับ objective calls จริง หลังเก็บ fitness ของประชากรเดิมไว้เพื่อไม่ประเมินซ้ำ ทุก method ใช้สามสิบครั้งตอนเริ่ม และสามสิบครั้งต่อ update รวม 3,030 ครั้ง ไม่รวมการวาด contour ซึ่งไม่ใช่การค้นหา ในกราฟจึงมีทั้งแกน iteration และแกน evaluations เวลาใช้ perf_counter วัดเฉพาะ initialization การค้นหาและบันทึก trace ไม่รวมวาดรูปหรือ export GA ใช้ arithmetic crossover กับ Gaussian mutation ไม่มี population elitism แต่มี archive ส่วน RLS เป็น local search สามสิบตัวขนานกัน ใช้ sigma เท่ากับ 0.3 และรับ proposal ที่ไม่แย่ลง พารามิเตอร์เหล่านี้คงที่ทั้งชุดและไม่ได้ปรับจูนเพื่อให้ method ใดชนะ''',
+'''Sphere เป็นชามเรียบ มี optimum ที่ศูนย์ศูนย์ และค่าฟังก์ชันต่ำสุดเป็นศูนย์ พิจารณาภาพเริ่มต้น iteration ศูนย์ จุดแดงคือประชากรสุ่มทั้งหมด ดาวเขียวคือตำแหน่ง optimum ที่ทราบจากสูตร ส่วนสัญลักษณ์สีส้มคือ archive ที่ algorithm หามาได้จริง ณ ตอนนั้น จึงไม่ควรเรียกดาวเขียวว่า target ของ algorithm
+
+ภาพกลางและท้ายแสดง iteration ห้าสิบและหนึ่งร้อย ลองติดตามว่า agents เคลื่อนที่อย่างไร และ archive ขยับเมื่อมีตำแหน่งที่ดีกว่า ค่า fitness บนแต่ละภาพประเมินจาก archive ของ frame นั้น ไม่ใช้ค่าคำตอบสุดท้ายย้อนไปแสดงในทุก frame เราเลือก seed 424242 ล่วงหน้าและเก็บเป็นตัวอย่างแยกจากสามสิบ runs ของสถิติ ไม่มีการคัดเลือก run ที่ดูดีที่สุดมาแสดง
+
+[เปิด MP4 หรือ GIF ประมาณ 17 วินาที หรือชี้ภาพ 0 → 50 → 100 หากใช้ PDF] จุดแดงที่ซ้อนกันช่วงท้ายบอกว่าประชากรกระจุกตัว แต่ไม่ใช่หลักฐานว่าค่า error เป็นศูนย์ ให้ดูตำแหน่งดาวเขียวและค่า best fitness ที่แสดงเป็น scientific notation ควบคู่กัน''',
+'''Rosenbrock มี minimum ที่หนึ่งหนึ่ง และ f star เท่ากับศูนย์ รูปร่างมีหุบเขาแคบและโค้งตามแนว y ใกล้ x ยกกำลังสอง ปัญหาคือการเข้าหาหุบเขาทำได้ก่อน แต่การเดินไปตามหุบเขาจนถึงจุด optimum อาจช้า การใช้สีจาก fitness โดยตรงจะทำให้บริเวณสำคัญดูแบน เราจึงใช้ log สิบของหนึ่งบวก f สำหรับสี contour เท่านั้น ค่าฟังก์ชันที่บันทึกและใช้เปรียบเทียบยังเป็นค่าจริง
+
+ภาพเคลื่อนไหวมีทั้งมุมมอง bounds เต็มและมุมมอง zoom ที่กำหนดล่วงหน้า Zoom ไม่ได้ลบ agents ที่อยู่นอกบริเวณนั้นจากข้อมูล และมีจำนวน agents ที่มองเห็นกำกับ หากมีหลายจุดทับกันจะไม่สรุปว่าทุก agent ถึง optimum ให้เปรียบเทียบตำแหน่ง archive กับดาวเขียว แทนการตัดสินจากขนาดกลุ่มจุดอย่างเดียว
+
+[เปิด MP4 หรือ GIF ประมาณ 17 วินาที แล้วหยุดที่ช่วงกลางและท้าย หากใช้ PDF ให้ชี้ snapshots] ค่า best-so-far ไม่เพิ่มขึ้นเพราะเก็บ archive แต่ความคืบหน้าอาจช้าลงหรือหยุดได้เมื่อ c ลดลงและ target ยังไม่ดีพอ ตัวอย่างรันนี้ใช้ seed เดียวกับ Sphere เพื่อให้การสาธิตทำซ้ำได้ ไม่ได้ใช้เพื่อประกาศว่า GOA หา optimum ได้ทุกรัน ผลรวมสามสิบ runs จะบอกความแปรปรวนที่ภาพเดียวไม่สามารถแสดงได้''',
+'''กราฟนี้ใช้ best-so-far ของแต่ละ independent run แล้วจึงเฉลี่ยข้ามสามสิบ runs เส้น GOA GA และ RLS จึงเป็นค่าเฉลี่ยของ archive ไม่ใช่ค่าเฉลี่ย fitness ของประชากรในรอบเดียว พื้นที่โปร่งแสดงบวกลบ sample standard deviation ใช้เพื่อเห็นความแปรปรวนระหว่าง runs และไม่ใช่ confidence interval หรือผลทดสอบความมีนัยสำคัญ
+
+กราฟ Sphere ด้านซ้ายแสดง mean best-so-far ส่วน Rosenbrock ด้านขวาแสดง optimality gap ซึ่งนิยามว่า best-so-far ลบ f star เนื่องจาก f star เป็นศูนย์ทั้งสองฟังก์ชัน ตัวเลข gap จึงเท่ากับ fitness ที่เราใช้ แต่เราเขียนนิยามเพื่อไม่ให้สับสนกับระยะทางพิกัดถึง optimum แกนแนวตั้งเป็น log เพื่อเห็นค่าต่างกันหลายลำดับขนาด หากค่าจริงเป็นศูนย์ ใช้ floor 10 ยกกำลังลบสิบหกสำหรับแสดงผลเท่านั้น ไม่แทนที่ค่าใน raw data และไม่รายงานว่า epsilon เป็นผลลัพธ์จริง
+
+[ชี้บริเวณช่วงต้น ช่วงท้าย และแถบ SD ประมาณ 10 วินาที] ค่า mean ที่ต่ำลงหมายถึงโดยเฉลี่ยพบคำตอบที่ดีขึ้น แต่แถบ SD กว้างบอกว่าคุณภาพแต่ละ run ไม่เหมือนกัน จึงต้องดู median และ distribution ด้วย''',
+'''Median คือค่ากลางเมื่อเรียง final fitness ของทุก run จึงไวต่อ run ที่ผิดพลาดมากน้อยกว่า mean กราฟด้านซ้ายติดตาม median best-so-far ของ Sphere ด้านขวาเป็น boxplot final fitness ของ Rosenbrock กล่องคือช่วงควอไทล์หนึ่งถึงสาม เส้นกลางคือ median สัญลักษณ์ diamond คือ mean และจุดเล็กแสดงค่าจากทุก run ไม่ใช่เฉพาะค่าที่ดูดี
+
+ใน setup นี้ GOA มี median ต่ำสุดทั้ง Sphere และ Rosenbrock แต่ Rosenbrock ของ GOA มีหางด้านค่ามาก บาง run จึงจบด้วย error มากกว่า runs ส่วนใหญ่ เมื่อ median ต่ำแต่ mean สูงกว่า median มาก แปลว่า run ที่ผิดพลาดมีอิทธิพลต่อค่าเฉลี่ย ข้อมูลนี้ทำให้คำว่า “GOA ดี” ต้องมีเงื่อนไขประกอบ ไม่ควรใช้กราฟเพียงเส้นเดียวเพื่อบอกว่ามีความเสถียรดีที่สุด
+
+[ชี้ mean median และ outliers ประมาณ 10 วินาที] RLS ก็มีความแปรปรวน แต่ worst fitness ของ RLS ใน Rosenbrock ชุดนี้ต่ำกว่า worst ของ GOA ขณะที่ GA ที่ใช้พารามิเตอร์ชุดนี้มี final fitness สูงกว่าโดยรวม ข้อสรุปนี้จำกัดอยู่ที่การตั้งค่าที่ระบุและสามสิบ runs ไม่ได้แทนผลของ GA ทุก variant หรือทุกค่าพารามิเตอร์''',
+f'''ตารางนี้รวมทุก run ไม่คัดทิ้ง โดยแสดง mean sample SD median best worst และเวลาเฉลี่ย GOA บน Sphere มี median ประมาณ {sg['median']:.3e} และบน Rosenbrock ประมาณ {rg['median']:.3e} RLS บน Rosenbrock มี median ประมาณ {rr['median']:.3e} เมื่อดูกรณีแย่ที่สุด GOA อยู่ที่ {rg['worst']:.3e} ขณะที่ RLS อยู่ที่ {rr['worst']:.3e}
+
+ไม่จำเป็นต้องอ่านตัวเลขทุกช่อง ให้ดูคุณภาพคำตอบกับต้นทุนควบคู่กัน RLS มีเวลาเฉลี่ยน้อยกว่า GOA ในทั้งสองฟังก์ชันบนเครื่องนี้ แม้ objective calls เท่ากัน เพราะ GOA ต้องคำนวณปฏิสัมพันธ์ระหว่าง agents ทุกคู่ เราไม่ได้บอกว่า GOA เป็นผู้ชนะทุกเกณฑ์ และไม่อ้างความแตกต่างเชิงสถิติจากตารางนี้ เวลาอาจต่างเมื่อเปลี่ยนเครื่องหรือ objective มีต้นทุนสูงขึ้น [ชี้ช่อง median worst และ time โดยใช้เวลาประมาณ 8 วินาที]''',
+'''ข้อสรุปจากข้อมูลจริงคือ GOA มี median final fitness ต่ำสุดทั้งสองฟังก์ชันในการตั้งค่านี้ แต่ RLS เร็วกว่า และบาง run ของ Rosenbrock ยังมี error มาก การรวมตัวของ agents ไม่รับประกัน global optimum ความซับซ้อนปฏิสัมพันธ์ของ GOA เป็น O ของ T คูณ N กำลังสองคูณ D ยังต้องบวกต้นทุน objective evaluations ด้วย
+
+ข้อจำกัดคือทดลองเฉพาะสองฟังก์ชันเรียบในสองมิติ ใช้พารามิเตอร์คงที่ และยังไม่ได้ทดสอบ constrained engineering design ขั้นต่อไปควรเพิ่มมิติ เพิ่มฟังก์ชัน multimodal ทดลองความไวต่อพารามิเตอร์ และตรวจ feasibility ในการประยุกต์จริง ทั้งหมดนี้เป็นข้อเสนอสำหรับงานต่อไป ไม่ใช่ผลที่อ้างว่าทำสำเร็จแล้ว''',
+'''แหล่งหลักคือ paper ของ Saremi และคณะปี 2017 กับเอกสาร workshop ใน repository สามารถตรวจ seed พารามิเตอร์ raw runs และสร้างชุดนำเสนอซ้ำได้ตาม README ขอบคุณครับ และยินดีตอบคำถาม'''
+    ]
+    lines=['# Script ภาษาไทย — Optimization Workshop','',
+           'เวลาที่จัดไว้รวม **720 วินาที (12 นาที)**; Q&A แยกจากเวลาบรรยาย เป้าหมายสูงสุด 15 นาที',
+           'เป็นเวลาออกแบบสำหรับซ้อม ยังไม่ใช่ผลวัดการพูดของผู้นำเสนอ อ่านด้วยความเร็วธรรมชาติและจับเวลาซ้อมหนึ่งรอบ หากช้าให้ลดรายละเอียดสมการ/การอ่านตาราง ก่อนตัดข้อสรุปหรือข้อจำกัด',
+           'ใช้ PPTX หรือ PDF ประกอบ เปิด MP4/GIF แยกที่สไลด์ 6 และ 7; ภาพ static เป็น fallback ที่มีข้อมูลเดียวกัน','']
+    elapsed=0
+    for i,(text,t) in enumerate(zip(scripts,TIMES)):
+        start=f'{elapsed//60:02d}:{elapsed%60:02d}';elapsed+=t;end=f'{elapsed//60:02d}:{elapsed%60:02d}'
+        lines.extend([f'## {i+1}. {TITLES[i]} — {start}–{end} ({t} วินาที)','',text,''])
+    (output/'script_th.md').write_text('\n'.join(lines),encoding='utf-8')
+    qa=[
+('ทำไมเลือก Sphere และ Rosenbrock?','Sphere เป็นชามเรียบใช้ตรวจว่าค้นหา minimum ได้หรือไม่ ส่วน Rosenbrock มีหุบเขาแคบโค้ง ใช้สังเกตการติดตามหุบเขา ทั้งคู่มี optimum ที่ทราบและแสดงตำแหน่งใน 2D ได้ แต่ยังไม่ครอบคลุม multimodal หรือปัญหาจริง'),
+('best-so-far ต่างจาก population mean อย่างไร?','best-so-far เป็น minimum ของ objective ที่เคยประเมินทั้งหมดจนถึงรอบนั้น จึงไม่แย่ลง ส่วน population mean เป็นค่าเฉลี่ยของประชากรปัจจุบันและอาจเพิ่มขึ้นได้ กราฟ mean convergence หลักคือการเฉลี่ย best-so-far ข้าม independent runs ไม่ใช่ population mean'),
+('ทำไมต้องรันซ้ำ?','ตำแหน่งเริ่มต้นและ operators ของ GA/RLS เป็นการสุ่ม GOA ใน variant นี้สุ่มที่ initialization ผลครั้งเดียวไม่บอกความแปรปรวน เราจึงเก็บ 30 runs ต่อคู่ method/function และใช้ข้อมูลทุก run ใน mean median SD best worst และ boxplot'),
+('การเปรียบเทียบยุติธรรมหรือไม่?','ใช้ dimensions bounds agents iterations และ seed schedule เดียวกันข้าม methods และวัด objective calls จริง หลัง caching ทุก method ใช้ 3030 calls พารามิเตอร์ไม่ได้ปรับจูน ความยุติธรรมยังจำกัดเพราะ operators และต้นทุนภายในต่างกัน และ RLS sigma เป็น absolute step ขณะที่ GA mutation ผูกกับ bound width'),
+('GOA ติด local optimum ได้หรือไม่?','ได้ การมีแรงผลักและลด c ไม่รับประกัน global optimum ใน multimodal อาจติด local minimum ส่วน Rosenbrock 2D ชุดนี้อาจหยุดในหุบเขาหรือแถว target ที่ยังไม่ถึง optimum โดยไม่จำเป็นต้องเรียกว่า local minimum'),
+('ผลต่างจาก paper เพราะอะไร?','เราใช้ 2D bounds agents iterations และ baseline parameters ตาม workshop ไม่เหมือนชุดทดลองทั้งหมดใน paper อีกทั้งใช้ normalization รายพิกัดเทียบ bound width, synchronous update, PCG64 และ c ของ updates 1..T ที่ระบุชัด จึงไม่อ้างว่าเป็น exact replication แม้เก็บโครงสร้าง Eq. 2.7/2.8'),
+('ความซับซ้อนของ GOA?','ปฏิสัมพันธ์ทุกคู่เป็น O(N²D) ต่อ update รวม O(TN²D) บวก (T+1)N objective calls การ vectorize ไม่เปลี่ยนลำดับความซับซ้อน กรณีเก็บ trace ทั้งหมดใช้ O(TND) และตัวคำนวณ pairwise ใช้หน่วยความจำชั่วคราว O(N²D)'),
+('ข้อจำกัดของผลทดลองนี้?','เพียงสอง smooth functions ใน 2D และ 30 runs ต่อ method/function พารามิเตอร์คงที่ ไม่มี tuning, significance test หรือ constrained application results จึงไม่สรุปว่า GOA ดีที่สุดเสมอ'),
+('ทำไมดาวเขียวกับ best-so-far ไม่ตรงกัน?','ดาวเขียวเป็น known optimum จากสูตร ไม่ส่งให้อัลกอริทึมใช้ค้นหา ส่วนสีส้มเป็นคำตอบที่หาได้จนถึง frame นั้น ความต่างสะท้อน error ที่ยังเหลือ และ archive ไม่จำเป็นต้องเป็นหนึ่งใน current agents ของ GOA/GA'),
+('ค่าศูนย์บน log scale จัดการอย่างไร?','เก็บค่าจริงใน JSON CSV NPZ โดยไม่เปลี่ยน ใช้ max(value, 1e-16) เฉพาะพิกัดที่วาดบน log axis พร้อมบอก floor ใน label ข้อมูล Rosenbrock contour ใช้ log10(1+f) เพื่อสีเท่านั้น ส่วน title และผลทดลองใช้ f จริง'),
+('ตัวอย่าง animation ถูกเลือกให้ดูดีที่สุดหรือไม่?','ไม่ seed 424242 ถูกกำหนดและเขียนใน config ก่อนเริ่มสถิติ ชุด animation แยกอยู่ใน examples/ ไม่รวมใน 180 statistical runs และไม่ใช้เพื่อประกาศผู้ชนะ'),
+('GOA ชนะในงานนี้หรือไม่?',f"มี median ต่ำสุดทั้งสอง functions ภายใต้ setup นี้ แต่ RLS เร็วกว่า และ worst Rosenbrock ของ GOA {rg['worst']:.3e} มากกว่า RLS {rr['worst']:.3e} ไม่ได้ทดสอบนัยสำคัญและไม่สรุป universal superiority"),
+('จำนวน evaluations เท่ากันแล้วทำไมเวลาไม่เท่ากัน?','GOA คำนวณ social interactions ทุกคู่ GA ทำ selection crossover mutation ส่วน RLS เสนอและตรวจการขยับเป็นราย agent objective ของเรามีราคาถูก จึงเห็นต้นทุนภายในชัด เวลา runtime ไม่รวมการ export และเป็นผลบนเครื่องนี้'),
+('seed เดียวกันข้าม methods แปลว่ารันไม่ independent หรือไม่?','รันภายในแต่ละ method ใช้ seed ที่แตกต่างกัน ระหว่าง methods จับคู่ initial state ด้วย seed เดียวกันเพื่อควบคุมสภาพเริ่มต้น ดังนั้นข้อมูลข้าม methods มีการจับคู่ ไม่ควรใช้วิธีวิเคราะห์ทางสถิติที่สมมติว่าทุกกลุ่มอิสระต่อกันโดยไม่พิจารณาเรื่องนี้')]
+    text=['# Q&A ภาษาไทย','', 'คำตอบผูกกับ configuration และผล 180 runs ที่ส่งมอบ; Q&A อยู่นอกเวลา 12 นาที','']
+    for i,(q,a) in enumerate(qa,1):text.extend([f'## {i}. {q}','',a,''])
+    (output/'qa_th.md').write_text('\n'.join(text),encoding='utf-8')
+    report=['# Measured workshop results','', 'All 180 runs are included; 30 per algorithm/function. Sample SD uses ddof=1. Lower fitness is better.','',
+            '| Function | Method | Mean | Median | SD | Best | Worst | Mean time (s) | Evaluations |',
+            '|---|---|---:|---:|---:|---:|---:|---:|---:|']
+    for r in rows:report.append('| '+ ' | '.join([r['function'],r['algorithm'].upper(),*[f"{r[k]:.6e}" for k in ['mean','median','sd','best','worst']],f"{r['runtime_mean_s']:.6f}",str(r['evaluations_min'])])+' |')
+    report.extend(['','GOA has the lowest observed median in both functions for this configuration. RLS has the lowest mean measured runtime in both. GOA’s worst Rosenbrock run is worse than RLS’s worst run; GOA’s small median does not imply uniformly reliable performance. These are descriptive results, without significance testing or universal performance claims.','',
+                   'The optimality gap equals fitness here because both f* = 0. Equal evaluation counts arise from cached deterministic fitness: initial N plus N per update. Runtime is hardware dependent and excludes figures/export.','',
+                   'See config.json, provenance.json, runs/*.json, runs/*.csv, runs/*.npz and summary.csv.'])
+    (root/'RESULTS.md').write_text('\n'.join(report),encoding='utf-8')

@@ -1,0 +1,18 @@
+[
+  {
+    "function": "sphere",
+    "seed": 424242,
+    "frames": 101,
+    "gif": "animations/sphere_goa.gif",
+    "fps": 6,
+    "mp4": "animations/sphere_goa.mp4"
+  },
+  {
+    "function": "rosenbrock",
+    "seed": 424242,
+    "frames": 101,
+    "gif": "animations/rosenbrock_goa.gif",
+    "fps": 6,
+    "mp4": "animations/rosenbrock_goa.mp4"
+  }
+]

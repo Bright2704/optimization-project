@@ -1,15 +1,15 @@
 """
 Grasshopper Optimisation Algorithm (GOA) - Version 2
 =====================================================
-Improved implementation matching paper more closely
+Compatibility class for the canonical workshop GOA
 
 Based on: Saremi et al. (2017)
 "Grasshopper Optimisation Algorithm: Theory and application"
 Advances in Engineering Software 105 (2017) 30-47
 
 Key improvements:
-- Distance normalization per dimension (not Euclidean)
-- Matches paper's Eq. (2.7) more precisely
+- Bound-scaled coordinate social distances; Euclidean direction vectors
+- Retains both c factors; explicit normalization choice documented in docs/methodology.md
 """
 
 import numpy as np
@@ -20,7 +20,7 @@ class GOA_v2:
     """
     Grasshopper Optimisation Algorithm - Improved Version
 
-    This version normalizes distances per-dimension as described in the paper.
+    This version uses coordinate/bound normalization, an explicit implementation choice.
     """
 
     def __init__(
@@ -84,108 +84,24 @@ class GOA_v2:
         return np.linalg.norm(a - b)
 
     def optimize(self, verbose: bool = True) -> Tuple[np.ndarray, float]:
-        """
-        Run the GOA optimization algorithm (Paper-accurate version)
-        """
-        # Initialize population randomly
-        grasshoppers = self.rng.uniform(
-            low=self.lower_bound,
-            high=self.upper_bound,
-            size=(self.n_grasshoppers, self.n_variables)
+        """Use the canonical workshop GOA; retain the original class interface."""
+        from algorithms.core import optimize
+        self.result = optimize(
+            "goa", self.fitness_func, self.n_variables, self.lower_bound,
+            self.upper_bound, self.n_grasshoppers, self.max_iter, self.seed,
+            track_positions=True, c_max=self.c_max, c_min=self.c_min,
+            f=self.f, l=self.l,
         )
-
-        # Calculate initial fitness and find target
-        fitness = np.array([self.fitness_func(g) for g in grasshoppers])
-        best_idx = np.argmin(fitness)
-        target = grasshoppers[best_idx].copy()
-        target_fitness = fitness[best_idx]
-
-        self.convergence_curve = [target_fitness]
-
+        self.best_position = self.result.best_position
+        self.best_fitness = self.result.best_fitness
+        self.convergence_curve = self.result.history
+        self.positions_history = self.result.positions_history
+        self.best_positions_history = self.result.best_positions_history
+        self.evaluation_count = self.result.evaluation_count
         if verbose:
-            print(f"{'='*60}")
-            print(f"GOA v2 (Paper-accurate implementation)")
-            print(f"{'='*60}")
-            print(f"Variables: {self.n_variables}, Grasshoppers: {self.n_grasshoppers}")
-            print(f"Max iterations: {self.max_iter}")
-            print(f"Initial best fitness: {target_fitness:.8f}")
-            print(f"{'='*60}")
-
-        # Main optimization loop
-        for iteration in range(self.max_iter):
-            c = self._calculate_c(iteration)
-
-            # Store new positions
-            new_positions = np.zeros_like(grasshoppers)
-
-            for i in range(self.n_grasshoppers):
-                S = np.zeros(self.n_variables)
-
-                for j in range(self.n_grasshoppers):
-                    if i != j:
-                        # Calculate distance (Euclidean) for normalization
-                        current_dist = self._distance(grasshoppers[i], grasshoppers[j])
-
-                        if current_dist < 1e-10:
-                            continue
-
-                        # Process each dimension separately (as per paper Eq. 2.7)
-                        for d in range(self.n_variables):
-                            # Distance in this dimension
-                            dist_d = abs(grasshoppers[j, d] - grasshoppers[i, d])
-
-                            # Normalize distance to [1, 4]
-                            # Paper: "normalize the distances between grasshoppers in [1,4]"
-                            r_norm = 1 + (dist_d / (self.upper_bound[d] - self.lower_bound[d])) * 3
-                            r_norm = np.clip(r_norm, 1, 4)
-
-                            # Social force
-                            s_val = self._social_force(r_norm)
-
-                            # Direction (unit vector component)
-                            if current_dist > 1e-10:
-                                direction = (grasshoppers[j, d] - grasshoppers[i, d]) / current_dist
-                            else:
-                                direction = 0
-
-                            # Accumulate: c * (ub - lb) / 2 * s * direction
-                            S[d] += c * ((self.upper_bound[d] - self.lower_bound[d]) / 2) * s_val * direction
-
-                # Update position: X_i = c * S + Target
-                new_positions[i] = c * S + target
-
-                # Boundary check
-                new_positions[i] = np.clip(new_positions[i], self.lower_bound, self.upper_bound)
-
-            # Update grasshoppers
-            grasshoppers = new_positions.copy()
-
-            # Evaluate fitness and update target
-            fitness = np.array([self.fitness_func(g) for g in grasshoppers])
-            best_idx = np.argmin(fitness)
-
-            if fitness[best_idx] < target_fitness:
-                target = grasshoppers[best_idx].copy()
-                target_fitness = fitness[best_idx]
-
-            self.convergence_curve.append(target_fitness)
-
-            report_every = max(1, self.max_iter // 10)
-            if verbose and (iteration + 1) % report_every == 0:
-                print(f"Iteration {iteration + 1:4d}/{self.max_iter}: "
-                      f"Best = {target_fitness:.8f}, c = {c:.6f}")
-
-        self.best_position = target
-        self.best_fitness = target_fitness
-
-        if verbose:
-            print(f"{'='*60}")
-            print(f"Optimization completed!")
-            print(f"Best position: {target}")
-            print(f"Best fitness:  {target_fitness:.8f}")
-            print(f"{'='*60}")
-
-        return target, target_fitness
+            print(f"GOA (documented normalization variant): best={self.best_fitness:.8g}, "
+                  f"evaluations={self.evaluation_count}")
+        return self.best_position, self.best_fitness
 
 
 # ============================================================================

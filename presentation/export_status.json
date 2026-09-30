@@ -1,0 +1,18 @@
+{
+  "pptx": "presentation/GOA_Optimization_Workshop.pptx",
+  "pdf_available": true,
+  "command": [
+    "libreoffice",
+    "-env:UserInstallation=file:///tmp/goa-workshop-lo",
+    "--headless",
+    "--convert-to",
+    "pdf",
+    "--outdir",
+    "/tmp/goa-workshop-pdf-ab3n0paa",
+    "/home/tsuna/project/testoptimizetion/optimization-project/presentation/GOA_Optimization_Workshop.pptx"
+  ],
+  "returncode": 0,
+  "output": "convert /home/tsuna/project/testoptimizetion/optimization-project/presentation/GOA_Optimization_Workshop.pptx as a Impress document -> /tmp/goa-workshop-pdf-ab3n0paa/GOA_Optimization_Workshop.pdf using filter : impress_pdf_Export\n",
+  "pptx_sha256": "0442d0cc448f4e1236ad63880241c5f3e8e596e395c641b24b3d20db10e8b963",
+  "pdf_sha256": "2e4afe4c69b008629bb09c473ebfee037741523f45afc88acdec663d78418256"
+}

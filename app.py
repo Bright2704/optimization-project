@@ -10,12 +10,14 @@
 =============================================================================
 """
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_file
 import numpy as np
-import json
+from pathlib import Path
+from time import perf_counter
+from algorithms.core import optimize
 
 # Import algorithms
-from algorithms import random_local_search, genetic_algorithm, grasshopper_optimization
+from utils.objective_functions import paraboloid as sphere, rosenbrock, rastrigin
 
 app = Flask(__name__)
 
@@ -24,21 +26,6 @@ app = Flask(__name__)
 # Objective Functions
 # =============================================================================
 
-def sphere(x):
-    """Sphere: f(x) = sum(x_i^2), min = 0 at origin"""
-    return float(np.sum(np.array(x)**2))
-
-def rastrigin(x):
-    """Rastrigin: highly multimodal, min = 0 at origin"""
-    x = np.array(x)
-    n = len(x)
-    return float(10 * n + np.sum(x**2 - 10 * np.cos(2 * np.pi * x)))
-
-def rosenbrock(x):
-    """Rosenbrock: valley-shaped, min = 0 at (1,1)"""
-    x = np.array(x)
-    return float(np.sum(100 * (x[1:] - x[:-1]**2)**2 + (x[:-1] - 1)**2))
-
 # Dictionary ของ functions
 FUNCTIONS = {
     'sphere': {
@@ -46,21 +33,21 @@ FUNCTIONS = {
         'name': 'Sphere',
         'formula': 'f(x) = x₁² + x₂²',
         'minimum': '0 at (0, 0)',
-        'bounds': (-5, 5)
+        'bounds': (-5, 5), 'optimum_position': [0, 0], 'optimum_fitness': 0.0
     },
     'rastrigin': {
         'func': rastrigin,
         'name': 'Rastrigin',
         'formula': 'f(x) = 20 + x₁² + x₂² - 10(cos(2πx₁) + cos(2πx₂))',
         'minimum': '0 at (0, 0)',
-        'bounds': (-5.12, 5.12)
+        'bounds': (-5.12, 5.12), 'optimum_position': [0, 0], 'optimum_fitness': 0.0
     },
     'rosenbrock': {
         'func': rosenbrock,
         'name': 'Rosenbrock',
         'formula': 'f(x) = 100(x₂ - x₁²)² + (x₁ - 1)²',
         'minimum': '0 at (1, 1)',
-        'bounds': (-2, 2)
+        'bounds': (-2, 2), 'optimum_position': [1, 1], 'optimum_fitness': 0.0
     }
 }
 
@@ -89,170 +76,78 @@ def get_functions():
     return jsonify(result)
 
 
+@app.route('/assets/plotly.min.js')
+def plotly_asset():
+    """Bundled dependency for an offline workshop demo."""
+    import plotly
+    return send_file(Path(plotly.__file__).parent / "package_data" / "plotly.min.js",
+                     mimetype="text/javascript")
+
+
+def run_request(include_frames):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error="Expected a JSON object"), 400
+    try:
+        algorithm = data.get("algorithm", "goa")
+        function_name = data.get("function", "sphere")
+        if algorithm not in {"goa", "ga", "rls"} or function_name not in FUNCTIONS:
+            raise ValueError("Unknown algorithm or function")
+        n_agents = int(data.get("n_agents", 30))
+        max_iter = int(data.get("max_iter", 100))
+        seed = int(data.get("seed", 424242))
+        if not 2 <= n_agents <= 100 or not 0 <= max_iter <= 1000 or seed < 0:
+            raise ValueError("Require 2..100 agents, 0..1000 iterations, nonnegative seed")
+        info = FUNCTIONS[function_name]
+        bounds = info["bounds"]
+        result = optimize(algorithm, info["func"], 2, [bounds[0]]*2, [bounds[1]]*2,
+                          n_agents, max_iter, seed, track_positions=include_frames)
+    except (ValueError, TypeError, OverflowError) as error:
+        return jsonify(error=str(error)), 400
+    payload = {
+        "algorithm": {"goa": "Grasshopper (GOA)", "ga": "Genetic Algorithm",
+                      "rls": "Random Local Search"}[algorithm],
+        "function": info["name"], "position": result.best_position.tolist(),
+        "fitness": result.best_fitness, "history": result.history, "bounds": bounds,
+        "best_positions_history": [x.tolist() for x in result.best_positions_history],
+        "population_mean_history": [float(np.mean(x)) for x in result.population_fitness_history],
+        "evaluations_history": result.evaluations_history,
+        "evaluation_count": result.evaluation_count, "runtime_seconds": result.runtime_seconds,
+        "known_optimum": {"position": info["optimum_position"], "fitness": info["optimum_fitness"]},
+        "seed": seed, "n_agents": n_agents,
+    }
+    if include_frames:
+        payload.update(frames=[x.tolist() for x in result.positions_history],
+                       n_frames=len(result.positions_history))
+    return jsonify(payload)
+
+
 @app.route('/api/run', methods=['POST'])
 def run_algorithm():
-    """รัน algorithm และส่งผลลัพธ์กลับ"""
-    data = request.json
-
-    # รับ parameters
-    algorithm = data.get('algorithm', 'rls')
-    function_name = data.get('function', 'sphere')
-    n_agents = int(data.get('n_agents', 20))
-    max_iter = int(data.get('max_iter', 50))
-
-    # เลือก function
-    func_info = FUNCTIONS.get(function_name, FUNCTIONS['sphere'])
-    fitness_func = func_info['func']
-    bounds = func_info['bounds']
-
-    # Parameters
-    n_variables = 2  # ใช้ 2D สำหรับ visualization
-    lb = [bounds[0]] * n_variables
-    ub = [bounds[1]] * n_variables
-
-    # รัน algorithm
-    if algorithm == 'rls':
-        pos, fit, history = random_local_search(
-            fitness_func=fitness_func,
-            n_variables=n_variables,
-            lower_bound=lb,
-            upper_bound=ub,
-            n_agents=n_agents,
-            max_iter=max_iter,
-            step_size=0.3
-        )
-        algo_name = 'Random Local Search'
-
-    elif algorithm == 'ga':
-        pos, fit, history = genetic_algorithm(
-            fitness_func=fitness_func,
-            n_variables=n_variables,
-            lower_bound=lb,
-            upper_bound=ub,
-            pop_size=n_agents,
-            max_iter=max_iter
-        )
-        algo_name = 'Genetic Algorithm'
-
-    elif algorithm == 'goa':
-        pos, fit, history = grasshopper_optimization(
-            fitness_func=fitness_func,
-            n_variables=n_variables,
-            lower_bound=lb,
-            upper_bound=ub,
-            n_grasshoppers=n_agents,
-            max_iter=max_iter
-        )
-        algo_name = 'Grasshopper (GOA)'
-
-    else:
-        return jsonify({'error': 'Unknown algorithm'}), 400
-
-    # ส่งผลลัพธ์กลับ
-    return jsonify({
-        'algorithm': algo_name,
-        'function': func_info['name'],
-        'position': [round(float(p), 6) for p in pos],
-        'fitness': round(float(fit), 8),
-        'history': [round(float(h), 6) for h in history],
-        'bounds': bounds
-    })
+    return run_request(False)
 
 
 @app.route('/api/run_animation', methods=['POST'])
 def run_animation():
-    """รัน algorithm และส่งประวัติตำแหน่งทุก agent สำหรับ animation"""
-    data = request.json
-
-    # รับ parameters
-    algorithm = data.get('algorithm', 'rls')
-    function_name = data.get('function', 'sphere')
-    n_agents = int(data.get('n_agents', 20))
-    max_iter = int(data.get('max_iter', 50))
-
-    # เลือก function
-    func_info = FUNCTIONS.get(function_name, FUNCTIONS['sphere'])
-    fitness_func = func_info['func']
-    bounds = func_info['bounds']
-
-    # Parameters
-    n_variables = 2  # ใช้ 2D สำหรับ visualization
-    lb = [bounds[0]] * n_variables
-    ub = [bounds[1]] * n_variables
-
-    # รัน algorithm with track_positions=True
-    if algorithm == 'rls':
-        pos, fit, history, positions_history = random_local_search(
-            fitness_func=fitness_func,
-            n_variables=n_variables,
-            lower_bound=lb,
-            upper_bound=ub,
-            n_agents=n_agents,
-            max_iter=max_iter,
-            step_size=0.3,
-            track_positions=True
-        )
-        algo_name = 'Random Local Search'
-
-    elif algorithm == 'ga':
-        pos, fit, history, positions_history = genetic_algorithm(
-            fitness_func=fitness_func,
-            n_variables=n_variables,
-            lower_bound=lb,
-            upper_bound=ub,
-            pop_size=n_agents,
-            max_iter=max_iter,
-            track_positions=True
-        )
-        algo_name = 'Genetic Algorithm'
-
-    elif algorithm == 'goa':
-        pos, fit, history, positions_history = grasshopper_optimization(
-            fitness_func=fitness_func,
-            n_variables=n_variables,
-            lower_bound=lb,
-            upper_bound=ub,
-            n_grasshoppers=n_agents,
-            max_iter=max_iter,
-            track_positions=True
-        )
-        algo_name = 'Grasshopper (GOA)'
-
-    else:
-        return jsonify({'error': 'Unknown algorithm'}), 400
-
-    # แปลง positions_history เป็น list ของ frames
-    # แต่ละ frame = [[x1,y1], [x2,y2], ...] สำหรับทุก agent
-    frames = []
-    for positions in positions_history:
-        frame = [[round(float(p[0]), 4), round(float(p[1]), 4)] for p in positions]
-        frames.append(frame)
-
-    return jsonify({
-        'algorithm': algo_name,
-        'function': func_info['name'],
-        'position': [round(float(p), 6) for p in pos],
-        'fitness': round(float(fit), 8),
-        'history': [round(float(h), 6) for h in history],
-        'bounds': bounds,
-        'frames': frames,  # ประวัติตำแหน่งทุก agent
-        'n_frames': len(frames),
-        'n_agents': n_agents
-    })
+    return run_request(True)
 
 
 @app.route('/api/contour', methods=['POST'])
 def get_contour():
     """สร้างข้อมูลสำหรับวาด contour plot"""
-    data = request.json
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify(error='Expected a JSON object'), 400
     function_name = data.get('function', 'sphere')
 
-    func_info = FUNCTIONS.get(function_name, FUNCTIONS['sphere'])
+    if function_name not in FUNCTIONS:
+        return jsonify(error='Unknown function'), 400
+    func_info = FUNCTIONS[function_name]
     fitness_func = func_info['func']
     bounds = func_info['bounds']
 
     # สร้าง grid
-    resolution = 50
+    resolution = 100
     x = np.linspace(bounds[0], bounds[1], resolution)
     y = np.linspace(bounds[0], bounds[1], resolution)
 
@@ -268,6 +163,9 @@ def get_contour():
         'x': x.tolist(),
         'y': y.tolist(),
         'z': z,
+        'color_z': np.log10(1 + np.array(z)).tolist() if function_name == 'rosenbrock' else z,
+        'color_transform': 'log10(1 + f)' if function_name == 'rosenbrock' else 'f',
+        'known_optimum': {'position': func_info['optimum_position'], 'fitness': 0.0},
         'bounds': bounds
     })
 
@@ -277,8 +175,12 @@ def get_contour():
 # =============================================================================
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=8080)
+    args = parser.parse_args()
     print("=" * 50)
     print("  Optimization Algorithms Web Demo")
-    print("  Open: http://localhost:8080")
+    print(f"  Open: http://127.0.0.1:{args.port}")
     print("=" * 50)
-    app.run(debug=True, port=8080, host='127.0.0.1')
+    app.run(debug=False, port=args.port, host='127.0.0.1')

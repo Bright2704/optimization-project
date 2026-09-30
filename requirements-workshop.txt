@@ -1,0 +1,10 @@
+# Direct dependencies; compatible Python 3.11+ ranges.
+# Exact tested environment: requirements-workshop.lock.txt
+numpy>=1.26,<3
+matplotlib>=3.9,<4
+Flask>=3.1,<4
+Pillow>=10,<13
+python-pptx>=1.0,<2
+plotly>=6,<8
+pytest>=8,<10
+playwright>=1.50,<2

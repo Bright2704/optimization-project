@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -73,6 +74,9 @@ def run_objective_tests(
                     "best_fitness": float(fitness),
                     "best_position": position.copy(),
                     "convergence": np.asarray(optimizer.convergence_curve),
+                    "runtime_seconds": optimizer.result.runtime_seconds,
+                    "evaluation_count": optimizer.evaluation_count,
+                    "configuration": {"dimensions": dimensions, "agents": agents, "iterations": iterations, "bounds": [lower, upper]},
                 }
             )
             print(
@@ -95,7 +99,7 @@ def _known_fitness(name: str, dimensions: int) -> float:
 
 
 def _write_results(records: list[dict], path: Path) -> None:
-    fields = ("function", "run", "seed", "best_fitness", "best_position")
+    fields = ("function", "run", "seed", "best_fitness", "best_position", "runtime_seconds", "evaluation_count", "configuration", "convergence")
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
@@ -105,6 +109,10 @@ def _write_results(records: list[dict], path: Path) -> None:
                     "function": record["function"],
                     "run": record["run"],
                     "seed": record["seed"],
+                    "runtime_seconds": record["runtime_seconds"],
+                    "evaluation_count": record["evaluation_count"],
+                    "configuration": json.dumps(record["configuration"]),
+                    "convergence": json.dumps(record["convergence"].tolist()),
                     "best_fitness": record["best_fitness"],
                     "best_position": np.array2string(
                         record["best_position"], separator=" ", max_line_width=10_000
@@ -147,11 +155,12 @@ def _plot_convergence(records: list[dict], path: Path) -> None:
         selected = [record for record in records if record["function"] == name]
         curves = np.stack([record["convergence"] for record in selected])
         known_fitness = _known_fitness(name, selected[0]["best_position"].size)
-        gaps = np.maximum(curves - known_fitness, np.finfo(float).tiny)
+        gaps = curves - known_fitness
+        display_gaps = np.maximum(gaps, 1e-16)
         x = np.arange(curves.shape[1])
-        for gap in gaps:
+        for gap in display_gaps:
             axis.plot(x, gap, alpha=0.25, linewidth=1)
-        axis.plot(x, gaps.mean(axis=0), color="black", linewidth=2, label="Mean gap")
+        axis.plot(x, np.maximum(gaps.mean(axis=0),1e-16), color="black", linewidth=2, label="Mean gap across independent runs")
         axis.set_yscale("log")
         axis.set(
             title=name.capitalize(),
@@ -162,7 +171,7 @@ def _plot_convergence(records: list[dict], path: Path) -> None:
         axis.legend(fontsize=8)
 
     axes.flat[-1].axis("off")
-    figure.suptitle("GOA optimality-gap convergence", fontsize=17)
+    figure.suptitle("GOA optimality-gap convergence (display floor ε=1e-16 only)", fontsize=17)
     figure.savefig(path, dpi=160)
     plt.close(figure)
 

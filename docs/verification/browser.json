@@ -1,0 +1,80 @@
+{
+  "status": "passed",
+  "browser": "Chromium / Playwright",
+  "real_browser": true,
+  "url": "http://127.0.0.1:8091",
+  "playwright_version": "1.63.0",
+  "combinations": [
+    {
+      "function": "sphere",
+      "algorithm": "goa",
+      "frames": 51,
+      "iteration_25_marker_and_value": true,
+      "play": true,
+      "pause": true,
+      "seek_last": true,
+      "reset": true,
+      "step": true
+    },
+    {
+      "function": "sphere",
+      "algorithm": "ga",
+      "frames": 51,
+      "iteration_25_marker_and_value": true,
+      "play": true,
+      "pause": true,
+      "seek_last": true,
+      "reset": true,
+      "step": true
+    },
+    {
+      "function": "sphere",
+      "algorithm": "rls",
+      "frames": 51,
+      "iteration_25_marker_and_value": true,
+      "play": true,
+      "pause": true,
+      "seek_last": true,
+      "reset": true,
+      "step": true
+    },
+    {
+      "function": "rosenbrock",
+      "algorithm": "goa",
+      "frames": 51,
+      "iteration_25_marker_and_value": true,
+      "play": true,
+      "pause": true,
+      "seek_last": true,
+      "reset": true,
+      "step": true
+    },
+    {
+      "function": "rosenbrock",
+      "algorithm": "ga",
+      "frames": 51,
+      "iteration_25_marker_and_value": true,
+      "play": true,
+      "pause": true,
+      "seek_last": true,
+      "reset": true,
+      "step": true
+    },
+    {
+      "function": "rosenbrock",
+      "algorithm": "rls",
+      "frames": 51,
+      "iteration_25_marker_and_value": true,
+      "play": true,
+      "pause": true,
+      "seek_last": true,
+      "reset": true,
+      "step": true
+    }
+  ],
+  "offline_external_requests": [],
+  "page_errors": [],
+  "compare_all_both_functions": true,
+  "thai_english_switch": true,
+  "full_30_agent_100_iteration_goa_both_functions": true
+}

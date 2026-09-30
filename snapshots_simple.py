@@ -29,53 +29,11 @@ def rosenbrock(x, y):
 # 2. GOA Algorithm (แบบง่าย)
 # =============================================================================
 
-def run_goa(func, n_agents=20, max_iter=50, bounds=(-5, 5)):
-    """รัน GOA และเก็บประวัติ"""
-
-    # สร้าง agents สุ่ม
-    agents_x = np.random.uniform(bounds[0], bounds[1], n_agents)
-    agents_y = np.random.uniform(bounds[0], bounds[1], n_agents)
-
-    # หา target (ตัวที่ดีที่สุด)
-    fitness = func(agents_x, agents_y)
-    best_idx = np.argmin(fitness)
-    target_x, target_y = agents_x[best_idx], agents_y[best_idx]
-
-    # เก็บประวัติ
-    history = [(agents_x.copy(), agents_y.copy(), target_x, target_y)]
-
-    # Main loop
-    for iteration in range(max_iter):
-        c = 1 - iteration * (1 - 0.0001) / max_iter
-
-        new_x = np.zeros(n_agents)
-        new_y = np.zeros(n_agents)
-
-        for i in range(n_agents):
-            force_x, force_y = 0, 0
-            for j in range(n_agents):
-                if i != j:
-                    dx = agents_x[j] - agents_x[i]
-                    dy = agents_y[j] - agents_y[i]
-                    dist = np.sqrt(dx**2 + dy**2) + 0.0001
-                    r = min(max(dist, 1), 4)
-                    s = 0.5 * np.exp(-r / 1.5) - np.exp(-r)
-                    force_x += s * dx / dist
-                    force_y += s * dy / dist
-
-            new_x[i] = np.clip(c * force_x + target_x, bounds[0], bounds[1])
-            new_y[i] = np.clip(c * force_y + target_y, bounds[0], bounds[1])
-
-        agents_x, agents_y = new_x, new_y
-
-        fitness = func(agents_x, agents_y)
-        best_idx = np.argmin(fitness)
-        if fitness[best_idx] < func(target_x, target_y):
-            target_x, target_y = agents_x[best_idx], agents_y[best_idx]
-
-        history.append((agents_x.copy(), agents_y.copy(), target_x, target_y))
-
-    return history
+def run_goa(func, n_agents=30, max_iter=100, bounds=(-5, 5), seed=424242):
+    """Legacy snapshot tuple format backed by the canonical GOA."""
+    from animation_simple import run_goa_simple
+    history, best_history = run_goa_simple(func, n_agents, max_iter, bounds, seed)
+    return [(x, y, best[0], best[1]) for (x, y), best in zip(history, best_history)]
 
 # =============================================================================
 # 3. สร้าง Snapshot 1 รูป
@@ -93,18 +51,19 @@ def draw_snapshot(ax, func, history, frame, bounds, optimal, title_prefix=""):
     X, Y = np.meshgrid(x, y)
     Z = func(X, Y)
 
-    ax.contourf(X, Y, Z, levels=20, cmap='Blues', alpha=0.5)
+    color = np.log10(1 + Z) if optimal == (1, 1) else Z
+    ax.contourf(X, Y, color, levels=20, cmap='Blues', alpha=0.5)
 
     # วาด agents (จุดแดง)
     ax.scatter(agents_x, agents_y, c='red', s=80, label='Agents', zorder=5)
 
     # วาด best (ดาวเหลือง)
     ax.scatter(best_x, best_y, c='yellow', s=200, marker='*',
-               edgecolors='orange', linewidths=2, label='Best', zorder=6)
+               edgecolors='orange', linewidths=2, label='Best-so-far', zorder=6)
 
     # วาด optimal (ดาวเขียว)
     ax.scatter(optimal[0], optimal[1], c='lime', s=300, marker='*',
-               edgecolors='green', linewidths=2, label='Target', zorder=7)
+               edgecolors='green', linewidths=2, label='Known optimum', zorder=7)
 
     # ตกแต่ง
     ax.set_xlim(bounds[0], bounds[1])
@@ -115,18 +74,17 @@ def draw_snapshot(ax, func, history, frame, bounds, optimal, title_prefix=""):
 
     ax.set_title(f'{title_prefix}Iteration {frame}\n'
                 f'Best: ({best_x:.3f}, {best_y:.3f})\n'
-                f'Fitness: {fitness:.6f}', fontsize=11)
+                f'Fitness: {fitness:.3e}', fontsize=11)
 
 # =============================================================================
 # 4. สร้างภาพ Snapshots หลายๆ รูป
 # =============================================================================
 
-def create_snapshots(func, func_name, bounds, optimal, n_agents=20, max_iter=50):
+def create_snapshots(func, func_name, bounds, optimal, n_agents=30, max_iter=100, seed=424242):
     """สร้าง snapshot images"""
 
     print(f"กำลังรัน GOA บน {func_name}...")
-    np.random.seed(42)  # ให้ผลลัพธ์เหมือนกันทุกครั้ง
-    history = run_goa(func, n_agents, max_iter, bounds)
+    history = run_goa(func, n_agents, max_iter, bounds, seed)
 
     # สร้าง folder
     output_dir = "snapshots"
@@ -145,8 +103,9 @@ def create_snapshots(func, func_name, bounds, optimal, n_agents=20, max_iter=50)
     for i, frame in enumerate(frames):
         draw_snapshot(axes[i], func, history, frame, bounds, optimal)
 
-    fig.suptitle(f'GOA on {func_name} - Snapshots', fontsize=14, fontweight='bold')
-    plt.tight_layout()
+    fig.suptitle(f'GOA on {func_name} - seed {seed} (single run)', fontsize=14, fontweight='bold')
+    fig.text(.5, .01, 'Contour color: ' + ('log10(1 + f)' if optimal == (1, 1) else 'raw f'), ha='center')
+    plt.tight_layout(rect=[0,.04,1,1])
 
     filename = f"{output_dir}/{func_name.lower().replace(' ', '_')}_all.png"
     plt.savefig(filename, dpi=150, bbox_inches='tight')

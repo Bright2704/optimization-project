@@ -1,0 +1,58 @@
+{
+  "status": "passed",
+  "statistical_runs": 180,
+  "recalculated_population_fitness_values": 545400,
+  "trace_states_per_run": 101,
+  "agents_per_state": 30,
+  "all_raw_frames_and_best_positions_recomputed": true,
+  "all_run_config_and_seeds_verified": true,
+  "all_summaries_recomputed_from_every_run": true,
+  "evaluations_per_run": 3030,
+  "example_traces_reproduced": true,
+  "png_exports_checked": 32,
+  "svg_exports_checked": 32,
+  "videos": [
+    {
+      "function": "sphere",
+      "gif_frames": 101,
+      "gif_size": [
+        1020,
+        450
+      ],
+      "mp4": {
+        "codec_name": "h264",
+        "width": 1440,
+        "height": 636,
+        "duration": "16.833008",
+        "nb_frames": "101"
+      }
+    },
+    {
+      "function": "rosenbrock",
+      "gif_frames": 101,
+      "gif_size": [
+        1020,
+        450
+      ],
+      "mp4": {
+        "codec_name": "h264",
+        "width": 1440,
+        "height": 636,
+        "duration": "16.833333",
+        "nb_frames": "101"
+      }
+    }
+  ],
+  "pptx_slides": 12,
+  "pdf_pages": 12,
+  "pdf_text_inside_page": true,
+  "exact_measured_statistics_found_in_pdf": true,
+  "talk_allocated_seconds": 720,
+  "source_hashes_current": {
+    "algorithms/core.py": "81d515b0a37da59dbf3e6f6bad0e0c20d453f9944949e55cb734aae4635fbc83",
+    "workshop/experiments.py": "803453b59d3eeebdb9bd8a0b95b960b44d63fe35c68a14c7ca90dfcc6234e80c",
+    "utils/objective_functions.py": "b787eaffba0c231ef8531d1477f5085b6ad6fa4c8479d2aaf824df6f790c3f0f"
+  },
+  "browser_verification": "See docs/verification/browser.json; separate real-browser test",
+  "visual_review": "See rendered slide pages and contact sheet; automated geometry alone does not prove readability"
+}

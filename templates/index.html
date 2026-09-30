@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Optimization Algorithms Demo</title>
     <link rel="stylesheet" href="/static/style.css">
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="/assets/plotly.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -28,7 +28,7 @@
                 <select id="algorithm">
                     <option value="rls">Random Local Search (RLS)</option>
                     <option value="ga">Genetic Algorithm (GA)</option>
-                    <option value="goa">Grasshopper (GOA)</option>
+                    <option value="goa" selected>Grasshopper (GOA)</option>
                 </select>
             </div>
 
@@ -42,15 +42,16 @@
             </div>
 
             <div class="control-group">
-                <label><span data-th="Agents:" data-en="Agents:">Agents:</span> <span id="agents-value">20</span></label>
-                <input type="range" id="n-agents" min="10" max="50" value="20">
+                <label><span data-th="Agents:" data-en="Agents:">Agents:</span> <span id="agents-value">30</span></label>
+                <input type="range" id="n-agents" min="10" max="50" value="30">
             </div>
 
             <div class="control-group">
-                <label><span data-th="Iterations:" data-en="Iterations:">Iterations:</span> <span id="iter-value">50</span></label>
-                <input type="range" id="max-iter" min="10" max="200" value="50">
+                <label><span data-th="Iterations:" data-en="Iterations:">Iterations:</span> <span id="iter-value">100</span></label>
+                <input type="range" id="max-iter" min="10" max="200" value="100">
             </div>
 
+            <div class="control-group"><label for="seed">Seed:</label><input id="seed" type="number" min="0" value="424242"></div>
             <button id="run-btn" onclick="runAlgorithm()" data-th="Run Algorithm" data-en="Run Algorithm">Run Algorithm</button>
             <button id="compare-btn" onclick="compareAll()" data-th="เปรียบเทียบทั้งหมด" data-en="Compare All">เปรียบเทียบทั้งหมด</button>
             <button id="animation-btn" onclick="runAnimation()" data-th="▶ ดู Animation" data-en="▶ Watch Animation" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">▶ ดู Animation</button>
@@ -92,7 +93,8 @@
             <!-- Simple Legend -->
             <div class="animation-legend">
                 <span class="legend-item"><span class="dot red"></span> <span data-th="Agents (กำลังค้นหา)" data-en="Agents (searching)">Agents (กำลังค้นหา)</span></span>
-                <span class="legend-item"><span class="dot green"></span> <span data-th="เป้าหมาย (คำตอบที่ดีที่สุด)" data-en="Target (best solution)">เป้าหมาย (คำตอบที่ดีที่สุด)</span></span>
+                <span class="legend-item"><span class="dot green"></span> <span data-th="Known optimum (ค่าที่ทราบจากสูตร)" data-en="Known optimum">Known optimum (ค่าที่ทราบจากสูตร)</span></span>
+                <span class="legend-item"><span style="color:#ffb000;">◇</span> Best-so-far</span>
                 <span class="legend-item"><span class="dot gray"></span> <span data-th="เส้นทางที่ผ่านมา" data-en="Previous path">เส้นทางที่ผ่านมา</span></span>
             </div>
 
@@ -149,9 +151,9 @@
             <div class="quick-jump">
                 <span data-th="กระโดดไป:" data-en="Jump to:">กระโดดไป:</span>
                 <button onclick="seekAnimation(0)" class="jump-btn" data-th="เริ่มต้น" data-en="Start">เริ่มต้น</button>
-                <button onclick="seekAnimation(Math.floor(animationData.n_frames * 0.25))" class="jump-btn">25%</button>
-                <button onclick="seekAnimation(Math.floor(animationData.n_frames * 0.5))" class="jump-btn">50%</button>
-                <button onclick="seekAnimation(Math.floor(animationData.n_frames * 0.75))" class="jump-btn">75%</button>
+                <button onclick="seekAnimation(Math.floor((animationData.n_frames - 1) * 0.25))" class="jump-btn">25%</button>
+                <button onclick="seekAnimation(Math.floor((animationData.n_frames - 1) * 0.5))" class="jump-btn">50%</button>
+                <button onclick="seekAnimation(Math.floor((animationData.n_frames - 1) * 0.75))" class="jump-btn">75%</button>
                 <button onclick="seekAnimation(animationData.n_frames - 1)" class="jump-btn" data-th="สุดท้าย" data-en="End">สุดท้าย</button>
             </div>
         </div>
@@ -216,7 +218,7 @@ Social Force: s(r) = f*exp(-r/l) - exp(-r)
   - <span data-th="ใกล้กัน → ผลักกัน" data-en="close → repulsion">ใกล้กัน → ผลักกัน</span>
   - <span data-th="ห่างกัน → ดึงดูด" data-en="far → attraction">ห่างกัน → ดึงดูด</span>
 
-Position: X_new = c * [Social Forces] + Target
+Position: X_new = c * [Σ c * (ub-lb)/2 * s(r) * direction] + Best-so-far
   - c <span data-th="ลดลงตาม iteration (exploration → exploitation)" data-en="decreases over iterations (exploration → exploitation)">ลดลงตาม iteration (exploration → exploitation)</span>
                 </pre>
             </div>

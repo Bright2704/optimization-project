@@ -32,95 +32,24 @@ def rosenbrock(x, y):
 # 2. Grasshopper Optimization Algorithm (GOA) - แบบง่าย
 # =============================================================================
 
-def run_goa_simple(func, n_agents=20, max_iter=50, bounds=(-5, 5)):
-    """
-    GOA Algorithm แบบง่าย
-
-    Parameters:
-        func: ฟังก์ชันที่ต้องการ minimize
-        n_agents: จำนวน agents (ตั๊กแตน)
-        max_iter: จำนวนรอบ
-        bounds: ขอบเขตการค้นหา
-
-    Returns:
-        history: list ของตำแหน่ง agents ในแต่ละรอบ
-        best_history: list ของตำแหน่งที่ดีที่สุดในแต่ละรอบ
-    """
-
-    # --- Step 1: สร้าง agents แบบสุ่ม ---
-    agents_x = np.random.uniform(bounds[0], bounds[1], n_agents)
-    agents_y = np.random.uniform(bounds[0], bounds[1], n_agents)
-
-    # หาตัวที่ดีที่สุด
-    fitness = func(agents_x, agents_y)
-    best_idx = np.argmin(fitness)
-    target_x, target_y = agents_x[best_idx], agents_y[best_idx]
-
-    # เก็บประวัติ
-    history = [(agents_x.copy(), agents_y.copy())]
-    best_history = [(target_x, target_y)]
-
-    # --- Step 2: Loop หลัก ---
-    for iteration in range(max_iter):
-
-        # c ลดลงจาก 1 ไป 0.0001 (exploration -> exploitation)
-        c = 1 - iteration * (1 - 0.0001) / max_iter
-
-        # อัพเดทตำแหน่งแต่ละ agent
-        new_x = np.zeros(n_agents)
-        new_y = np.zeros(n_agents)
-
-        for i in range(n_agents):
-            # คำนวณแรงจาก agents ตัวอื่น
-            force_x, force_y = 0, 0
-
-            for j in range(n_agents):
-                if i != j:
-                    # ระยะห่าง
-                    dx = agents_x[j] - agents_x[i]
-                    dy = agents_y[j] - agents_y[i]
-                    dist = np.sqrt(dx**2 + dy**2) + 0.0001
-
-                    # Social force: s(r) = 0.5*exp(-r/1.5) - exp(-r)
-                    r = min(max(dist, 1), 4)  # normalize to [1, 4]
-                    s = 0.5 * np.exp(-r / 1.5) - np.exp(-r)
-
-                    # สะสมแรง
-                    force_x += s * dx / dist
-                    force_y += s * dy / dist
-
-            # ตำแหน่งใหม่ = c * แรง + target
-            new_x[i] = c * force_x + target_x
-            new_y[i] = c * force_y + target_y
-
-            # ตรวจสอบขอบเขต
-            new_x[i] = np.clip(new_x[i], bounds[0], bounds[1])
-            new_y[i] = np.clip(new_y[i], bounds[0], bounds[1])
-
-        # อัพเดท agents
-        agents_x, agents_y = new_x, new_y
-
-        # อัพเดท target (ถ้าเจอตัวที่ดีกว่า)
-        fitness = func(agents_x, agents_y)
-        best_idx = np.argmin(fitness)
-        if fitness[best_idx] < func(target_x, target_y):
-            target_x, target_y = agents_x[best_idx], agents_y[best_idx]
-
-        # เก็บประวัติ
-        history.append((agents_x.copy(), agents_y.copy()))
-        best_history.append((target_x, target_y))
-
+def run_goa_simple(func, n_agents=30, max_iter=100, bounds=(-5, 5), seed=424242):
+    """Legacy two-coordinate interface using the canonical workshop GOA."""
+    from algorithms.core import optimize
+    result = optimize('goa', lambda x: float(func(x[0], x[1])), 2,
+                      [bounds[0]]*2, [bounds[1]]*2, n_agents, max_iter, seed)
+    history = [(p[:, 0].copy(), p[:, 1].copy()) for p in result.positions_history]
+    best_history = [tuple(p) for p in result.best_positions_history]
     return history, best_history
 
 # =============================================================================
 # 3. สร้าง Animation
 # =============================================================================
 
-def create_animation(func, func_name, bounds, optimal_point, n_agents=20, max_iter=50):
+def create_animation(func, func_name, bounds, optimal_point, n_agents=30, max_iter=100, seed=424242):
     """สร้าง Animation แสดงการทำงานของ GOA"""
 
     print(f"กำลังรัน GOA บน {func_name}...")
-    history, best_history = run_goa_simple(func, n_agents, max_iter, bounds)
+    history, best_history = run_goa_simple(func, n_agents, max_iter, bounds, seed)
     print(f"เสร็จแล้ว! Best fitness = {func(*best_history[-1]):.6f}")
 
     # --- สร้าง Figure ---
@@ -132,18 +61,19 @@ def create_animation(func, func_name, bounds, optimal_point, n_agents=20, max_it
     X, Y = np.meshgrid(x, y)
     Z = func(X, Y)
 
-    contour = ax.contourf(X, Y, Z, levels=30, cmap='Blues', alpha=0.6)
-    plt.colorbar(contour, ax=ax, label='Fitness')
+    color = np.log10(1 + Z) if optimal_point == (1, 1) else Z
+    contour = ax.contourf(X, Y, color, levels=30, cmap='Blues', alpha=0.6)
+    plt.colorbar(contour, ax=ax, label='log10(1 + f)' if optimal_point == (1, 1) else 'Fitness')
 
     # จุดเป้าหมายที่แท้จริง
     ax.plot(optimal_point[0], optimal_point[1], 'g*', markersize=20,
-            label=f'Global Optimum {optimal_point}', zorder=10)
+            label=f'Known optimum {optimal_point}', zorder=10)
 
     # สร้าง scatter plot สำหรับ agents
     agents_scatter = ax.scatter([], [], c='red', s=100, label='Agents', zorder=5)
     best_scatter = ax.scatter([], [], c='yellow', s=200, marker='*',
                                edgecolors='orange', linewidths=2,
-                               label='Current Best', zorder=6)
+                               label='Best-so-far', zorder=6)
 
     # Title และ labels
     title = ax.set_title(f'{func_name} - Iteration 0/{max_iter}', fontsize=14)
@@ -166,7 +96,7 @@ def create_animation(func, func_name, bounds, optimal_point, n_agents=20, max_it
 
         # อัพเดท title
         title.set_text(f'{func_name} - Iteration {frame}/{max_iter}\n'
-                      f'Best: ({best_x:.4f}, {best_y:.4f}) | Fitness: {fitness:.6f}')
+                      f'Best: ({best_x:.4f}, {best_y:.4f}) | Fitness: {fitness:.3e} | Seed: {seed}')
 
         return agents_scatter, best_scatter, title
 
@@ -206,12 +136,12 @@ if __name__ == "__main__":
 
     print()
     fig, anim = create_animation(func, func_name, bounds, optimal,
-                                  n_agents=20, max_iter=50)
+                                  n_agents=30, max_iter=100)
 
     print()
     print("กำลังแสดง Animation...")
     print("  - จุดแดง = Agents (กำลังค้นหา)")
-    print("  - ดาวเหลือง = ตำแหน่งที่ดีที่สุดในรอบนั้น")
+    print("  - ดาวเหลือง = best-so-far ถึงรอบนั้น")
     print("  - ดาวเขียว = คำตอบที่ถูกต้อง")
     print()
     print("ปิดหน้าต่างเพื่อจบโปรแกรม")
